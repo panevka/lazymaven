@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fs, io, iter::Map};
+use std::{collections::HashMap, fmt, fs, io, iter::Map};
 
 use xmltree::Element;
 
@@ -47,5 +47,21 @@ impl MavenFile {
         }
 
         return dependencies;
+    }
+}
+
+impl fmt::Debug for MavenFile {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("MavenFile")
+            .field("root", &self.root)
+            .finish()
+    }
+}
+
+impl Default for MavenFile {
+    fn default() -> Self {
+        Self {
+            root: Element::new("default"),
+        }
     }
 }

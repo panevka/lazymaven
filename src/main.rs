@@ -1,8 +1,10 @@
-mod parser;
+mod debug;
+mod dependency;
 
 use color_eyre::Result;
 use core::fmt;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
+use dependency::JavaDependencyNode;
 use std::{collections::HashMap, fs, io};
 use xmltree::{Element, Error};
 // use ratatui::{DefaultTerminal, Frame};
@@ -24,7 +26,7 @@ use ratatui::{
     },
 };
 
-use crate::parser::MavenFile;
+use crate::dependency::MavenFile;
 
 const TODO_HEADER_STYLE: Style = Style::new().fg(SLATE.c100).bg(BLUE.c800);
 const NORMAL_ROW_BG: Color = SLATE.c950;
@@ -39,6 +41,7 @@ fn main() -> Result<(), Error> {
 
     println!("{:#?}", dependencies);
 
+    //
     let mut terminal = ratatui::init();
     let _ = App::default().run(&mut terminal);
     ratatui::restore();
@@ -46,7 +49,7 @@ fn main() -> Result<(), Error> {
 }
 
 pub struct DependencyList {
-    items: Vec<HashMap<String, String>>,
+    items: Vec<JavaDependencyNode>,
     state: ListState,
 }
 
@@ -90,7 +93,7 @@ pub struct App {
 impl App {
     fn run(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
         let maven = MavenFile::from_file("./static/pom.xml".to_string())?;
-        let dependencies = maven.get_dependencies();
+        let dependencies = maven.get_dependencies()?;
         self.dependencies.items = dependencies;
 
         while !self.exit {
@@ -212,13 +215,14 @@ impl App {
             .iter()
             .enumerate()
             .map(|(i, dependency)| {
-                let id_tag = String::from("groupId");
-                let dependency_name = dependency
-                    .get(&id_tag)
-                    .cloned()
-                    .unwrap_or(String::from("None"));
+                // let id_tag = String::from("groupId");
+                let dependency_name = &dependency
+                    // .get(&id_tag)
+                    .group_id;
+                // .cloned()
+                // .unwrap_or(String::from("None"));
                 let color = alternate_colors(i);
-                ListItem::new(dependency_name).bg(color)
+                ListItem::new(String::from(dependency_name)).bg(color)
             })
             .collect();
 

@@ -215,14 +215,11 @@ impl App {
             .iter()
             .enumerate()
             .map(|(i, dependency)| {
-                // let id_tag = String::from("groupId");
-                let dependency_name = &dependency
-                    // .get(&id_tag)
-                    .group_id;
-                // .cloned()
-                // .unwrap_or(String::from("None"));
+                let item =
+                    String::from(format!("{} {}", &dependency.group_id, &dependency.version));
+
                 let color = alternate_colors(i);
-                ListItem::new(String::from(dependency_name)).bg(color)
+                ListItem::new(item).bg(color)
             })
             .collect();
 

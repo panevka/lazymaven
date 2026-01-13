@@ -2,12 +2,8 @@ mod debug;
 mod dependency;
 
 use color_eyre::Result;
-use core::fmt;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
-use dependency::JavaDependencyNode;
-use std::{collections::HashMap, fs, io};
-use xmltree::{Element, Error};
-// use ratatui::{DefaultTerminal, Frame};
+use dependency::JavaDependency;
 use ratatui::{
     DefaultTerminal, Frame,
     buffer::Buffer,
@@ -25,6 +21,8 @@ use ratatui::{
         Block, HighlightSpacing, List, ListItem, ListState, Paragraph, StatefulWidget, Widget,
     },
 };
+use std::io;
+use xmltree::Error;
 
 use crate::dependency::MavenFile;
 
@@ -37,65 +35,48 @@ const COMPLETED_TEXT_FG_COLOR: Color = GREEN.c500;
 
 fn main() -> Result<(), Error> {
     let maven = MavenFile::from_file("./static/pom.xml".to_string())?;
-    let dependencies = maven.get_dependencies();
 
-    println!("{:#?}", dependencies);
-
-    //
     let mut terminal = ratatui::init();
-    let _ = App::default().run(&mut terminal);
+    App::new(maven)?.run(&mut terminal);
     ratatui::restore();
     return Ok(());
 }
 
 pub struct DependencyList {
-    items: Vec<JavaDependencyNode>,
+    items: Vec<JavaDependency>,
     state: ListState,
 }
 
-impl Default for DependencyList {
-    fn default() -> Self {
-        Self {
-            items: Default::default(),
-            state: Default::default(),
-        }
-    }
-}
-
-impl fmt::Debug for DependencyList {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("DependencyList")
-            .field("items", &self.items)
-            .field("state", &self.state)
-            .finish()
-    }
-}
-
-// impl FromIterator<(Status, &'static str, &'static str)> for TodoList {
-//     fn from_iter<I: IntoIterator<Item = (Status, &'static str, &'static str)>>(iter: I) -> Self {
-//         let items = iter
-//             .into_iter()
-//             .map(|(status, todo, info)| TodoItem::new(status, todo, info))
-//             .collect();
-//         let state = ListState::default();
-//         Self { items, state }
-//     }
-// }
-
-#[derive(Debug, Default)]
 pub struct App {
     counter: u8,
-    // dependencies: Vec<HashMap<String, String>>,
+    maven_file: MavenFile,
     dependencies: DependencyList,
     exit: bool,
 }
 
 impl App {
-    fn run(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
-        let maven = MavenFile::from_file("./static/pom.xml".to_string())?;
-        let dependencies = maven.get_dependencies()?;
-        self.dependencies.items = dependencies;
+    fn new(maven_file: MavenFile) -> Result<Self, Error> {
+        let dependencies = {
+            let deps = maven_file.get_dependencies()?;
+            deps
+        };
 
+        let dependency_list = DependencyList {
+            items: dependencies,
+            state: ListState::default(),
+        };
+
+        let me = Self {
+            counter: 0,
+            dependencies: dependency_list,
+            maven_file: maven_file,
+            exit: false,
+        };
+
+        Ok(me)
+    }
+
+    fn run(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
         while !self.exit {
             terminal.draw(|frame| self.draw(frame))?;
             self.handle_events()?;
@@ -131,6 +112,7 @@ impl App {
             KeyCode::Right => self.increment_counter(),
             KeyCode::Char('j') => self.select_next(),
             KeyCode::Char('k') => self.select_previous(),
+            KeyCode::Char('d') => self.delete_selected_dependency(),
             _ => {}
         }
     }
@@ -145,6 +127,13 @@ impl App {
 
     fn exit(&mut self) {
         self.exit = true;
+    }
+
+    fn get_selected_dependency(&self) -> Option<&JavaDependency> {
+        let selected_item_index = self.dependencies.state.selected()?;
+        let selected_item = &self.dependencies.items[selected_item_index];
+
+        return Some(selected_item);
     }
 
     fn select_none(&mut self) {
@@ -164,6 +153,19 @@ impl App {
 
     fn select_last(&mut self) {
         self.dependencies.state.select_last();
+    }
+
+    fn delete_selected_dependency(&mut self) {
+        if let Some(index) = self.dependencies.state.selected() {
+            self.dependencies.items.remove(index);
+
+            let len = self.dependencies.items.len();
+            if len == 0 {
+                self.dependencies.state.select(None);
+            } else if index >= len {
+                self.dependencies.state.select(Some(len - 1));
+            }
+        }
     }
 }
 
@@ -189,11 +191,6 @@ impl Widget for &mut App {
         ])]);
 
         self.render_list(area, buf);
-
-        // Paragraph::new(counter_text.clone())
-        //     .centered()
-        //     .block(block)
-        //     .render(area, buf);
     }
 }
 
@@ -206,7 +203,11 @@ const fn alternate_colors(i: usize) -> Color {
 }
 
 impl App {
-    fn render_list(&mut self, area: Rect, buf: &mut Buffer) {
+    fn render_list(
+        &mut self,
+        area: Rect,
+        buf: &mut Buffer,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let block = Block::new().title(Line::raw("Dependencies").centered());
 
         let items: Vec<ListItem> = self
@@ -215,8 +216,7 @@ impl App {
             .iter()
             .enumerate()
             .map(|(i, dependency)| {
-                let item =
-                    String::from(format!("{} {}", &dependency.group_id, &dependency.version));
+                let item = String::from(format!("{} {}", dependency.group_id, dependency.version));
 
                 let color = alternate_colors(i);
                 ListItem::new(item).bg(color)
@@ -230,5 +230,6 @@ impl App {
             .highlight_spacing(HighlightSpacing::Always);
 
         StatefulWidget::render(list, area, buf, &mut self.dependencies.state);
+        Ok(())
     }
 }

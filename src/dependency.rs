@@ -40,15 +40,23 @@ impl MavenFile {
         Ok(dependencies)
     }
 
-    pub fn remove_dependency(&mut self, index: usize) {
+    pub fn remove_dependency(&mut self, group_id: &str) {
         if let Some(dependencies) = self.root.get_mut_child("dependencies") {
-            dependencies.children.remove(index);
+            dependencies
+                .children
+                .retain(|child| match child.as_element() {
+                    Some(element) => {
+                        let jd = JavaDependency::from_element(element);
+                        jd.group_id != group_id
+                    }
+                    None => true,
+                });
         }
     }
 }
 
 #[derive(Debug, PartialEq)]
-struct JavaDependency {
+pub struct JavaDependency {
     pub group_id: String,
     pub artifact_id: String,
     pub version: String,

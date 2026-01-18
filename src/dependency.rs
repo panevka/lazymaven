@@ -1,6 +1,7 @@
+use color_eyre::owo_colors::OwoColorize;
 use io::Error;
 use std::{
-    fs,
+    fs::{self, File},
     io::{self, ErrorKind},
 };
 
@@ -9,11 +10,12 @@ use xmltree::{Element, ElementPredicate};
 #[derive(Debug)]
 pub struct MavenFile {
     root: Element,
+    file_path: String,
 }
 
 impl MavenFile {
     pub fn from_file(file_path: String) -> Result<Self, std::io::Error> {
-        let file_content: String = fs::read_to_string(file_path)?;
+        let file_content: String = fs::read_to_string(&file_path)?;
 
         let xml_tree_root: Element = Element::parse(file_content.as_bytes())
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?
@@ -21,11 +23,12 @@ impl MavenFile {
 
         return Ok(Self {
             root: xml_tree_root,
+            file_path: file_path,
         });
     }
 
     pub fn get_dependencies(&self) -> Result<Vec<JavaDependency>, Error> {
-        let dependencies_root = self.root.get_child("dependencies").ok_or(Error::new(
+        let mut dependencies_root = self.root.get_child("dependencies").ok_or(Error::new(
             ErrorKind::Other,
             "could not find dependencies element",
         ))?;
@@ -40,18 +43,35 @@ impl MavenFile {
         Ok(dependencies)
     }
 
-    pub fn remove_dependency(&mut self, group_id: &str) {
-        if let Some(dependencies) = self.root.get_mut_child("dependencies") {
-            dependencies
-                .children
-                .retain(|child| match child.as_element() {
-                    Some(element) => {
-                        let jd = JavaDependency::from_element(element);
-                        jd.group_id != group_id
-                    }
-                    None => true,
-                });
-        }
+    pub fn update_dependencies(
+        &mut self,
+        updated_dependencies: &Vec<JavaDependency>,
+    ) -> Result<(), Error> {
+        let mut dependencies_root = self.root.get_mut_child("dependencies").ok_or(Error::new(
+            ErrorKind::Other,
+            "could not find dependencies element",
+        ))?;
+
+        dependencies_root.children.retain(|child| {
+            child
+                .as_element()
+                .map(|element| {
+                    let dependency = JavaDependency::from_element(element);
+
+                    updated_dependencies
+                        .iter()
+                        .any(|elem| elem.group_id == dependency.group_id)
+                })
+                .unwrap_or(true)
+        });
+
+        self.update_xml_file();
+
+        Ok(())
+    }
+
+    pub fn update_xml_file(&self) {
+        &self.root.write(File::create("result.xml").unwrap());
     }
 }
 

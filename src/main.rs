@@ -76,6 +76,13 @@ impl App {
         Ok(me)
     }
 
+    fn submit_dependency_changes(&mut self) -> Result<(), std::io::Error> {
+        let result = self
+            .maven_file
+            .update_dependencies(&self.dependencies.items);
+        return result;
+    }
+
     fn run(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
         while !self.exit {
             terminal.draw(|frame| self.draw(frame))?;
@@ -113,8 +120,14 @@ impl App {
             KeyCode::Char('j') => self.select_next(),
             KeyCode::Char('k') => self.select_previous(),
             KeyCode::Char('d') => self.delete_selected_dependency(),
+            KeyCode::Char('a') => {
+                self.submit_dependency_changes();
+                return ();
+            }
             _ => {}
         }
+
+        return ();
     }
 
     fn decrement_counter(&mut self) {

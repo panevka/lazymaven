@@ -2,7 +2,7 @@ use color_eyre::owo_colors::OwoColorize;
 use io::Error;
 use std::{
     fs::{self, File},
-    io::{self, ErrorKind},
+    io::{self, ErrorKind, Write},
 };
 
 use xmltree::{Element, ElementPredicate};
@@ -71,7 +71,14 @@ impl MavenFile {
     }
 
     pub fn update_xml_file(&self) {
-        &self.root.write(File::create("result.xml").unwrap());
+        let current_xml_file_path = self.file_path.clone();
+        let backup_xml_file_path = format!("{}.old", self.file_path);
+
+        let _ = fs::rename(&current_xml_file_path, backup_xml_file_path);
+
+        let _ = &self
+            .root
+            .write(File::create_new(current_xml_file_path).unwrap());
     }
 }
 

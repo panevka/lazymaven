@@ -1,39 +1,19 @@
 mod debug;
 mod dependency;
+mod maven_registry;
+mod ui;
 
 use color_eyre::Result;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use dependency::JavaDependency;
-use ratatui::{
-    DefaultTerminal, Frame,
-    buffer::Buffer,
-    layout::{Constraint, Direction, Rect},
-    style::{
-        Color, Modifier, Style, Stylize,
-        palette::{
-            material::{BLUE, GREEN},
-            tailwind::SLATE,
-        },
-    },
-    symbols::border,
-    text::{Line, Text},
-    widgets::{
-        Block, HighlightSpacing, List, ListItem, ListState, Paragraph, StatefulWidget, Widget,
-    },
-};
+use ratatui::{DefaultTerminal, widgets::ListState};
 use std::io;
 use xmltree::Error;
 
 use crate::dependency::MavenFile;
 
-const TODO_HEADER_STYLE: Style = Style::new().fg(SLATE.c100).bg(BLUE.c800);
-const NORMAL_ROW_BG: Color = SLATE.c950;
-const ALT_ROW_BG_COLOR: Color = SLATE.c900;
-const SELECTED_STYLE: Style = Style::new().bg(SLATE.c800).add_modifier(Modifier::BOLD);
-const TEXT_FG_COLOR: Color = SLATE.c200;
-const COMPLETED_TEXT_FG_COLOR: Color = GREEN.c500;
-
-fn main() -> Result<(), Error> {
+#[tokio::main]
+async fn main() -> Result<(), anyhow::Error> {
     let maven = MavenFile::from_file("./static/pom.xml".to_string())?;
 
     let mut terminal = ratatui::init();
@@ -85,19 +65,10 @@ impl App {
 
     fn run(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
         while !self.exit {
-            terminal.draw(|frame| self.draw(frame))?;
+            terminal.draw(|frame| ui::ui(frame, self))?;
             self.handle_events()?;
         }
         Ok(())
-    }
-
-    fn draw(&mut self, frame: &mut Frame) {
-        let chunks = ratatui::layout::Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints([Constraint::Percentage(50)])
-            .split(frame.area());
-
-        frame.render_widget(&mut *self, chunks[0]);
     }
 
     fn handle_events(&mut self) -> io::Result<()> {
@@ -179,70 +150,5 @@ impl App {
                 self.dependencies.state.select(Some(len - 1));
             }
         }
-    }
-}
-
-impl Widget for &mut App {
-    fn render(self, area: Rect, buf: &mut Buffer) {
-        let title = Line::from(" Counter App Tutorial ".bold());
-        let instructions = Line::from(vec![
-            " Decrement ".into(),
-            "<Left>".blue().bold(),
-            " Increment ".into(),
-            "<Right>".blue().bold(),
-            " Quit ".into(),
-            "<Q> ".blue().bold(),
-        ]);
-        let block = Block::bordered()
-            .title(title.clone().centered())
-            .title_bottom(instructions.clone().centered())
-            .border_set(border::THICK);
-
-        let counter_text = Text::from(vec![Line::from(vec![
-            "Value: ".into(),
-            self.counter.to_string().yellow(),
-        ])]);
-
-        self.render_list(area, buf);
-    }
-}
-
-const fn alternate_colors(i: usize) -> Color {
-    if i % 2 == 0 {
-        NORMAL_ROW_BG
-    } else {
-        ALT_ROW_BG_COLOR
-    }
-}
-
-impl App {
-    fn render_list(
-        &mut self,
-        area: Rect,
-        buf: &mut Buffer,
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        let block = Block::new().title(Line::raw("Dependencies").centered());
-
-        let items: Vec<ListItem> = self
-            .dependencies
-            .items
-            .iter()
-            .enumerate()
-            .map(|(i, dependency)| {
-                let item = String::from(format!("{} {}", dependency.group_id, dependency.version));
-
-                let color = alternate_colors(i);
-                ListItem::new(item).bg(color)
-            })
-            .collect();
-
-        let list = List::new(items)
-            .block(block)
-            .highlight_style(SELECTED_STYLE)
-            .highlight_symbol(">")
-            .highlight_spacing(HighlightSpacing::Always);
-
-        StatefulWidget::render(list, area, buf, &mut self.dependencies.state);
-        Ok(())
     }
 }

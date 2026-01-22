@@ -8,11 +8,16 @@ use ratatui::{
             tailwind::SLATE,
         },
     },
-    text::Line,
-    widgets::{Block, HighlightSpacing, List, ListItem},
+    text::{Line, Span, Text},
+    widgets::{self, Block, HighlightSpacing, List, ListItem},
 };
+use tui_textarea::TextArea;
 
-use crate::{App, dependency::JavaDependency};
+use crate::{
+    App,
+    dependency::JavaDependency,
+    maven_registry::{MavenRegistry, MavenResponse, SearchResponseDoc},
+};
 
 pub fn ui(f: &mut Frame, app: &mut App) {
     let chunks = ratatui::layout::Layout::default()
@@ -21,15 +26,17 @@ pub fn ui(f: &mut Frame, app: &mut App) {
         .split(f.area());
 
     let list = render_list(&app.dependencies.items);
-    let search = render_search();
+
+    let search = render_search(&app.search_phrase);
 
     f.render_stateful_widget(list, chunks[0], &mut app.dependencies.state);
 
-    f.render_widget(search, chunks[1]);
+    f.render_widget(&search, chunks[1]);
 }
 
-pub fn render_search() -> Block<'static> {
-    Block::new().title(Line::raw("Dupa").centered())
+pub fn render_search<'a>(input_content: &'a String) -> Span<'a> {
+    let span = Span::raw(input_content);
+    return span;
 }
 
 const TODO_HEADER_STYLE: Style = Style::new().fg(SLATE.c100).bg(BLUE.c800);

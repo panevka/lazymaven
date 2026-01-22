@@ -15,8 +15,8 @@ pub struct SearchResponse {
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all(serialize = "camelCase", deserialize = "camelCase"))]
-struct SearchResponseDoc {
-    id: String,
+pub struct SearchResponseDoc {
+    pub id: String,
     g: String,
     a: String,
     repository_id: String,

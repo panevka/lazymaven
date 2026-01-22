@@ -6,6 +6,7 @@ mod ui;
 use color_eyre::Result;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use dependency::JavaDependency;
+use maven_registry::MavenRegistry;
 use ratatui::{DefaultTerminal, widgets::ListState};
 use std::io;
 use xmltree::Error;
@@ -31,6 +32,8 @@ pub struct App {
     counter: u8,
     maven_file: MavenFile,
     dependencies: DependencyList,
+    search_phrase: String,
+    input_mode: bool,
     exit: bool,
 }
 
@@ -47,9 +50,11 @@ impl App {
         };
 
         let me = Self {
+            search_phrase: String::default(),
             counter: 0,
             dependencies: dependency_list,
             maven_file: maven_file,
+            input_mode: true,
             exit: false,
         };
 
@@ -84,8 +89,15 @@ impl App {
     }
 
     fn handle_key_event(&mut self, key_event: KeyEvent) {
+        if (self.input_mode && !key_event.code.is_esc()) {
+            self.update_input(key_event);
+            return ();
+        }
+
         match key_event.code {
             KeyCode::Char('q') => self.exit(),
+            KeyCode::Char('s') => self.input_mode = true,
+            KeyCode::Esc => self.input_mode = false,
             KeyCode::Left => self.decrement_counter(),
             KeyCode::Right => self.increment_counter(),
             KeyCode::Char('j') => self.select_next(),
@@ -150,5 +162,13 @@ impl App {
                 self.dependencies.state.select(Some(len - 1));
             }
         }
+    }
+
+    fn update_input(&mut self, key_event: KeyEvent) {
+        self.search_phrase = String::from(format!(
+            "{}{}",
+            self.search_phrase,
+            key_event.code.to_string()
+        ));
     }
 }

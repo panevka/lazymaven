@@ -1,4 +1,5 @@
 mod dependency;
+mod events;
 mod maven_registry;
 mod ui;
 
@@ -6,7 +7,7 @@ use color_eyre::Result;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use dependency::JavaDependency;
 use ratatui::{DefaultTerminal, widgets::ListState};
-use std::io;
+use std::{io, os::unix::process::ExitStatusExt};
 use xmltree::Error;
 
 use crate::dependency::MavenFile;
@@ -34,6 +35,22 @@ pub struct App {
     exit: bool,
 }
 
+pub enum Navigation {
+    Previous,
+    Next,
+}
+
+pub enum Intent {
+    Exit,
+    EnterInputMode,
+    LeaveInputMode,
+    SubmitDependencyChanges,
+    DeleteSelectedDependency,
+    UpdateInput(KeyCode),
+    NavigateDependencyList(Navigation),
+}
+
+// Core app logic
 impl App {
     fn new(maven_file: MavenFile) -> Result<Self, Error> {
         let dependencies = {
@@ -60,60 +77,82 @@ impl App {
     fn run(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
         while !self.exit {
             terminal.draw(|frame| ui::ui(frame, self))?;
-            self.handle_events()?;
+            let intents: Vec<Intent> = self.handle_events()?;
+
+            for intent in intents {
+                self.apply_intent(intent);
+            }
         }
         Ok(())
     }
 
-    fn handle_events(&mut self) -> io::Result<()> {
-        match event::read()? {
+    fn handle_events(&mut self) -> io::Result<Vec<Intent>> {
+        let mut intents = Vec::new();
+
+        if let Event::Key(key_event) = event::read()? {
             // it's important to check that the event is a key press event as
             // crossterm also emits key release and repeat events on Windows.
-            Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
-                self.handle_key_event(key_event)
+            if key_event.kind == KeyEventKind::Press {
+                let intent: Option<Intent> = self.handle_key_event(key_event);
+                intents.extend(intent);
             }
-            _ => {}
+        }
+
+        return Ok(intents);
+    }
+
+    fn handle_key_event(&mut self, key_event: KeyEvent) -> Option<Intent> {
+        if self.input_mode {
+            let intent = match key_event.code {
+                KeyCode::Esc => Some(Intent::LeaveInputMode), // allow leaving input mode
+                _ => Some(Intent::UpdateInput(key_event.code)), // all other keys update input
+            };
+
+            return intent;
+        }
+
+        let intent = match key_event.code {
+            KeyCode::Char('q') => Some(Intent::Exit),
+            KeyCode::Char('s') => Some(Intent::EnterInputMode),
+            KeyCode::Char('j') => Some(Intent::NavigateDependencyList(Navigation::Next)),
+            KeyCode::Char('k') => Some(Intent::NavigateDependencyList(Navigation::Previous)),
+            KeyCode::Char('d') => Some(Intent::DeleteSelectedDependency),
+            KeyCode::Char('a') => Some(Intent::SubmitDependencyChanges),
+            KeyCode::Char(_) if self.input_mode => Some(Intent::UpdateInput(key_event.code)),
+            _ => None,
         };
-        Ok(())
-    }
 
-    fn handle_key_event(&mut self, key_event: KeyEvent) {
-        if self.input_mode && !key_event.code.is_esc() {
-            self.update_input(key_event);
-            return ();
-        }
-
-        match key_event.code {
-            KeyCode::Char('q') => self.exit(),
-            KeyCode::Char('s') => self.input_mode = true,
-            KeyCode::Esc => self.input_mode = false,
-            KeyCode::Char('j') => self.select_next(),
-            KeyCode::Char('k') => self.select_previous(),
-            KeyCode::Char('d') => self.delete_selected_dependency(),
-            KeyCode::Char('a') => {
-                self.submit_dependency_changes();
-                return ();
-            }
-            _ => {}
-        }
-
-        return ();
-    }
-
-    fn exit(&mut self) {
-        self.exit = true;
-    }
-
-    fn update_input(&mut self, key_event: KeyEvent) {
-        self.search_phrase = String::from(format!(
-            "{}{}",
-            self.search_phrase,
-            key_event.code.to_string()
-        ));
+        return intent;
     }
 }
 
+// Event management
 impl App {
+    pub fn apply_intent(&mut self, intent: Intent) -> anyhow::Result<()> {
+        match intent {
+            Intent::Exit => self.exit_app(),
+            Intent::EnterInputMode => self.enter_input_mode(),
+            Intent::LeaveInputMode => self.leave_input_mode(),
+            Intent::NavigateDependencyList(direction) => self.navigate_dependency_list(direction),
+            Intent::SubmitDependencyChanges => self.submit_dependency_changes()?,
+            Intent::DeleteSelectedDependency => self.delete_selected_dependency(),
+            Intent::UpdateInput(key_code) => self.update_input(key_code),
+        }
+
+        return Ok(());
+    }
+
+    fn exit_app(&mut self) {
+        self.exit = true;
+    }
+    fn enter_input_mode(&mut self) {
+        self.input_mode = true;
+    }
+
+    fn leave_input_mode(&mut self) {
+        self.input_mode = false;
+    }
+
     fn submit_dependency_changes(&mut self) -> Result<(), std::io::Error> {
         let result = self
             .maven_file
@@ -121,12 +160,15 @@ impl App {
         return result;
     }
 
-    fn select_next(&mut self) {
-        self.dependencies.state.select_next();
+    fn navigate_dependency_list(&mut self, direction: Navigation) {
+        match direction {
+            Navigation::Next => self.dependencies.state.select_next(),
+            Navigation::Previous => self.dependencies.state.select_previous(),
+        }
     }
 
-    fn select_previous(&mut self) {
-        self.dependencies.state.select_previous();
+    fn update_input(&mut self, key_code: KeyCode) {
+        self.search_phrase = String::from(format!("{}{}", self.search_phrase, key_code));
     }
 
     fn delete_selected_dependency(&mut self) {

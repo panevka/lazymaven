@@ -1,4 +1,3 @@
-mod debug;
 mod dependency;
 mod maven_registry;
 mod ui;

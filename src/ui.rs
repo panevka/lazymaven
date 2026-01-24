@@ -1,3 +1,8 @@
+use crate::{
+    App,
+    dependency::JavaDependency,
+    maven_registry::{MavenRegistry, MavenResponse, SearchResponseDoc},
+};
 use ratatui::{
     Frame,
     layout::{Constraint, Direction},
@@ -10,13 +15,6 @@ use ratatui::{
     },
     text::{Line, Span, Text},
     widgets::{self, Block, HighlightSpacing, List, ListItem},
-};
-use tui_textarea::TextArea;
-
-use crate::{
-    App,
-    dependency::JavaDependency,
-    maven_registry::{MavenRegistry, MavenResponse, SearchResponseDoc},
 };
 
 pub fn ui(f: &mut Frame, app: &mut App) {

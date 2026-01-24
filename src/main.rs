@@ -5,7 +5,6 @@ mod ui;
 use color_eyre::Result;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use dependency::JavaDependency;
-use maven_registry::MavenRegistry;
 use ratatui::{DefaultTerminal, widgets::ListState};
 use std::io;
 use xmltree::Error;
@@ -17,7 +16,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let maven = MavenFile::from_file("./static/pom.xml".to_string())?;
 
     let mut terminal = ratatui::init();
-    App::new(maven)?.run(&mut terminal);
+    App::new(maven)?.run(&mut terminal)?;
     ratatui::restore();
     return Ok(());
 }
@@ -28,7 +27,6 @@ pub struct DependencyList {
 }
 
 pub struct App {
-    counter: u8,
     maven_file: MavenFile,
     dependencies: DependencyList,
     search_phrase: String,
@@ -50,21 +48,13 @@ impl App {
 
         let me = Self {
             search_phrase: String::default(),
-            counter: 0,
             dependencies: dependency_list,
-            maven_file: maven_file,
+            maven_file,
             input_mode: true,
             exit: false,
         };
 
         Ok(me)
-    }
-
-    fn submit_dependency_changes(&mut self) -> Result<(), std::io::Error> {
-        let result = self
-            .maven_file
-            .update_dependencies(&self.dependencies.items);
-        return result;
     }
 
     fn run(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
@@ -88,7 +78,7 @@ impl App {
     }
 
     fn handle_key_event(&mut self, key_event: KeyEvent) {
-        if (self.input_mode && !key_event.code.is_esc()) {
+        if self.input_mode && !key_event.code.is_esc() {
             self.update_input(key_event);
             return ();
         }
@@ -97,8 +87,6 @@ impl App {
             KeyCode::Char('q') => self.exit(),
             KeyCode::Char('s') => self.input_mode = true,
             KeyCode::Esc => self.input_mode = false,
-            KeyCode::Left => self.decrement_counter(),
-            KeyCode::Right => self.increment_counter(),
             KeyCode::Char('j') => self.select_next(),
             KeyCode::Char('k') => self.select_previous(),
             KeyCode::Char('d') => self.delete_selected_dependency(),
@@ -112,42 +100,33 @@ impl App {
         return ();
     }
 
-    fn decrement_counter(&mut self) {
-        self.counter -= 1;
-    }
-
-    fn increment_counter(&mut self) {
-        self.counter += 1;
-    }
-
     fn exit(&mut self) {
         self.exit = true;
     }
 
-    fn get_selected_dependency(&self) -> Option<&JavaDependency> {
-        let selected_item_index = self.dependencies.state.selected()?;
-        let selected_item = &self.dependencies.items[selected_item_index];
-
-        return Some(selected_item);
+    fn update_input(&mut self, key_event: KeyEvent) {
+        self.search_phrase = String::from(format!(
+            "{}{}",
+            self.search_phrase,
+            key_event.code.to_string()
+        ));
     }
+}
 
-    fn select_none(&mut self) {
-        self.dependencies.state.select(None);
+impl App {
+    fn submit_dependency_changes(&mut self) -> Result<(), std::io::Error> {
+        let result = self
+            .maven_file
+            .update_dependencies(&self.dependencies.items);
+        return result;
     }
 
     fn select_next(&mut self) {
         self.dependencies.state.select_next();
     }
+
     fn select_previous(&mut self) {
         self.dependencies.state.select_previous();
-    }
-
-    fn select_first(&mut self) {
-        self.dependencies.state.select_first();
-    }
-
-    fn select_last(&mut self) {
-        self.dependencies.state.select_last();
     }
 
     fn delete_selected_dependency(&mut self) {
@@ -161,13 +140,5 @@ impl App {
                 self.dependencies.state.select(Some(len - 1));
             }
         }
-    }
-
-    fn update_input(&mut self, key_event: KeyEvent) {
-        self.search_phrase = String::from(format!(
-            "{}{}",
-            self.search_phrase,
-            key_event.code.to_string()
-        ));
     }
 }

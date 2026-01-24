@@ -1,8 +1,7 @@
-use color_eyre::owo_colors::OwoColorize;
 use io::Error;
 use std::{
     fs::{self, File},
-    io::{self, ErrorKind, Write},
+    io::{self, ErrorKind},
 };
 
 use xmltree::{Element, ElementPredicate};
@@ -11,6 +10,13 @@ use xmltree::{Element, ElementPredicate};
 pub struct MavenFile {
     root: Element,
     file_path: String,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct JavaDependency {
+    pub group_id: String,
+    pub artifact_id: String,
+    pub version: String,
 }
 
 impl MavenFile {
@@ -23,12 +29,12 @@ impl MavenFile {
 
         return Ok(Self {
             root: xml_tree_root,
-            file_path: file_path,
+            file_path,
         });
     }
 
     pub fn get_dependencies(&self) -> Result<Vec<JavaDependency>, Error> {
-        let mut dependencies_root = self.root.get_child("dependencies").ok_or(Error::new(
+        let dependencies_root: &Element = self.root.get_child("dependencies").ok_or(Error::new(
             ErrorKind::Other,
             "could not find dependencies element",
         ))?;
@@ -47,7 +53,7 @@ impl MavenFile {
         &mut self,
         updated_dependencies: &Vec<JavaDependency>,
     ) -> Result<(), Error> {
-        let mut dependencies_root = self.root.get_mut_child("dependencies").ok_or(Error::new(
+        let dependencies_root = self.root.get_mut_child("dependencies").ok_or(Error::new(
             ErrorKind::Other,
             "could not find dependencies element",
         ))?;
@@ -82,13 +88,6 @@ impl MavenFile {
     }
 }
 
-#[derive(Debug, PartialEq)]
-pub struct JavaDependency {
-    pub group_id: String,
-    pub artifact_id: String,
-    pub version: String,
-}
-
 impl<'a> JavaDependency {
     fn from_element(dependency: &'a Element) -> JavaDependency {
         let mut group_id = None;
@@ -110,10 +109,6 @@ impl<'a> JavaDependency {
             artifact_id: artifact_id.unwrap_or_default(),
             version: version.unwrap_or_default(),
         }
-    }
-
-    fn edit_dependency_version(&mut self, dependency_version: String) {
-        self.version = dependency_version;
     }
 }
 

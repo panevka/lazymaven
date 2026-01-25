@@ -10,7 +10,7 @@ static API_URL: &str = "https://search.maven.org";
 pub struct SearchResponse {
     num_found: u32,
     start: u32,
-    docs: Vec<SearchResponseDoc>,
+    pub docs: Vec<SearchResponseDoc>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -30,7 +30,7 @@ pub struct SearchResponseDoc {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct MavenResponse {
-    response: SearchResponse,
+    pub response: SearchResponse,
 }
 
 impl MavenRegistry {

@@ -1,4 +1,4 @@
-use crate::{App, dependency::JavaDependency};
+use crate::{App, dependency::JavaDependency, maven_registry::SearchResponseDoc};
 use ratatui::{
     Frame,
     layout::{Constraint, Direction},
@@ -14,7 +14,11 @@ const SELECTED_STYLE: Style = Style::new().bg(SLATE.c800).add_modifier(Modifier:
 pub fn ui(f: &mut Frame, app: &mut App) {
     let chunks = ratatui::layout::Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+        .constraints([
+            Constraint::Percentage(50),
+            Constraint::Percentage(30),
+            Constraint::Percentage(20),
+        ])
         .split(f.area());
 
     let list = render_list(&app.dependencies.items);
@@ -22,6 +26,13 @@ pub fn ui(f: &mut Frame, app: &mut App) {
 
     f.render_stateful_widget(list, chunks[0], &mut app.dependencies.state);
     f.render_widget(&search, chunks[1]);
+
+    if let Ok(mut guard) = app.shared.try_lock() {
+        let deps = &mut guard.found_dependencies;
+        let found_dependencies = render_found_dependencies(&deps.items);
+
+        f.render_stateful_widget(found_dependencies, chunks[2], &mut deps.state);
+    }
 }
 
 pub fn render_search<'a>(input_content: &'a String) -> Span<'a> {
@@ -37,6 +48,27 @@ pub fn render_list(dependencies: &Vec<JavaDependency>) -> List {
         .enumerate()
         .map(|(i, dependency)| {
             let item = String::from(format!("{} {}", dependency.group_id, dependency.version));
+
+            let color = alternate_colors(i);
+            ListItem::new(item).bg(color)
+        })
+        .collect();
+
+    List::new(items)
+        .block(block)
+        .highlight_style(SELECTED_STYLE)
+        .highlight_symbol(">")
+        .highlight_spacing(HighlightSpacing::Always)
+}
+
+pub fn render_found_dependencies(found_dependencies: &Vec<SearchResponseDoc>) -> List {
+    let block = Block::new().title(Line::raw("Dependencies").centered());
+
+    let items: Vec<ListItem> = found_dependencies
+        .iter()
+        .enumerate()
+        .map(|(i, dependency)| {
+            let item = String::from(format!("{}", dependency.id));
 
             let color = alternate_colors(i);
             ListItem::new(item).bg(color)

@@ -6,8 +6,10 @@ mod ui;
 use color_eyre::Result;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use dependency::JavaDependency;
+use maven_registry::{MavenRegistry, SearchResponseDoc};
 use ratatui::{DefaultTerminal, widgets::ListState};
-use std::{io, os::unix::process::ExitStatusExt};
+use std::{io, os::unix::process::ExitStatusExt, sync::Arc};
+use tokio::sync::{Mutex, mpsc};
 use xmltree::Error;
 
 use crate::dependency::MavenFile;
@@ -27,12 +29,22 @@ pub struct DependencyList {
     state: ListState,
 }
 
+pub struct FoundDependencyList {
+    items: Vec<SearchResponseDoc>,
+    state: ListState,
+}
+
 pub struct App {
     maven_file: MavenFile,
     dependencies: DependencyList,
     search_phrase: String,
     input_mode: bool,
     exit: bool,
+    shared: Arc<Mutex<AppState>>,
+}
+
+pub struct AppState {
+    pub found_dependencies: FoundDependencyList, // pub found_dependencies: Vec<SearchResponseDoc>,
 }
 
 pub enum Navigation {
@@ -48,6 +60,7 @@ pub enum Intent {
     DeleteSelectedDependency,
     UpdateInput(KeyCode),
     NavigateDependencyList(Navigation),
+    FindNewDependencies(String),
 }
 
 // Core app logic
@@ -63,7 +76,17 @@ impl App {
             state: ListState::default(),
         };
 
+        let found_dependency_list = FoundDependencyList {
+            items: vec![],
+            state: ListState::default(),
+        };
+
+        let shared = Arc::new(Mutex::new(AppState {
+            found_dependencies: found_dependency_list,
+        }));
+
         let me = Self {
+            shared: shared,
             search_phrase: String::default(),
             dependencies: dependency_list,
             maven_file,
@@ -118,6 +141,7 @@ impl App {
             KeyCode::Char('k') => Some(Intent::NavigateDependencyList(Navigation::Previous)),
             KeyCode::Char('d') => Some(Intent::DeleteSelectedDependency),
             KeyCode::Char('a') => Some(Intent::SubmitDependencyChanges),
+            KeyCode::Char('w') => Some(Intent::FindNewDependencies(self.search_phrase.clone())),
             KeyCode::Char(_) if self.input_mode => Some(Intent::UpdateInput(key_event.code)),
             _ => None,
         };
@@ -137,6 +161,7 @@ impl App {
             Intent::SubmitDependencyChanges => self.submit_dependency_changes()?,
             Intent::DeleteSelectedDependency => self.delete_selected_dependency(),
             Intent::UpdateInput(key_code) => self.update_input(key_code),
+            Intent::FindNewDependencies(search_phrase) => self.find_new_dependencies(search_phrase),
         }
 
         return Ok(());
@@ -182,5 +207,21 @@ impl App {
                 self.dependencies.state.select(Some(len - 1));
             }
         }
+    }
+
+    fn find_new_dependencies(&self, search_phrase: String) {
+        let shared = Arc::clone(&self.shared);
+
+        tokio::spawn({
+            async move {
+                let found = MavenRegistry::search_dependencies(search_phrase).await?;
+                let mut guard = shared.lock().await;
+                guard.found_dependencies.items = found.response.docs;
+
+                return Ok::<(), anyhow::Error>(());
+            }
+        });
+
+        return ();
     }
 }

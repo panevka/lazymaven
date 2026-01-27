@@ -27,12 +27,10 @@ pub fn ui(f: &mut Frame, app: &mut App) {
     f.render_stateful_widget(list, chunks[0], &mut app.dependencies.state);
     f.render_widget(&search, chunks[1]);
 
-    if let Ok(mut guard) = app.shared.try_lock() {
-        let deps = &mut guard.found_dependencies;
-        let found_dependencies = render_found_dependencies(&deps.items);
+    let deps = &mut app.found_dependencies;
+    let found_dependencies = render_found_dependencies(&deps.items);
 
-        f.render_stateful_widget(found_dependencies, chunks[2], &mut deps.state);
-    }
+    f.render_stateful_widget(found_dependencies, chunks[2], &mut deps.state);
 }
 
 pub fn render_search<'a>(input_content: &'a String) -> Span<'a> {

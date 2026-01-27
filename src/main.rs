@@ -8,8 +8,11 @@ use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use dependency::JavaDependency;
 use maven_registry::{MavenRegistry, SearchResponseDoc};
 use ratatui::{DefaultTerminal, widgets::ListState};
-use std::{io, os::unix::process::ExitStatusExt, sync::Arc};
-use tokio::sync::{Mutex, mpsc};
+use std::{io, os::unix::process::ExitStatusExt, sync::Arc, time::Duration};
+use tokio::{
+    sync::{Mutex, mpsc},
+    task,
+};
 use xmltree::Error;
 
 use crate::dependency::MavenFile;
@@ -19,7 +22,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let maven = MavenFile::from_file("./static/pom.xml".to_string())?;
 
     let mut terminal = ratatui::init();
-    App::new(maven)?.run(&mut terminal)?;
+    App::new(maven)?.run(&mut terminal).await?;
     ratatui::restore();
     return Ok(());
 }
@@ -29,22 +32,21 @@ pub struct DependencyList {
     state: ListState,
 }
 
+#[derive(Default)]
 pub struct FoundDependencyList {
     items: Vec<SearchResponseDoc>,
     state: ListState,
 }
 
 pub struct App {
+    intent_tx: mpsc::Sender<Effects>,
+    intent_rx: mpsc::Receiver<Effects>,
     maven_file: MavenFile,
     dependencies: DependencyList,
     search_phrase: String,
     input_mode: bool,
+    pub found_dependencies: FoundDependencyList,
     exit: bool,
-    shared: Arc<Mutex<AppState>>,
-}
-
-pub struct AppState {
-    pub found_dependencies: FoundDependencyList, // pub found_dependencies: Vec<SearchResponseDoc>,
 }
 
 pub enum Navigation {
@@ -63,6 +65,10 @@ pub enum Intent {
     FindNewDependencies(String),
 }
 
+pub enum Effects {
+    DependenciesFound(Vec<SearchResponseDoc>),
+}
+
 // Core app logic
 impl App {
     fn new(maven_file: MavenFile) -> Result<Self, Error> {
@@ -76,17 +82,12 @@ impl App {
             state: ListState::default(),
         };
 
-        let found_dependency_list = FoundDependencyList {
-            items: vec![],
-            state: ListState::default(),
-        };
-
-        let shared = Arc::new(Mutex::new(AppState {
-            found_dependencies: found_dependency_list,
-        }));
+        let (tx, rx) = mpsc::channel::<Effects>(100);
 
         let me = Self {
-            shared: shared,
+            intent_tx: tx,
+            intent_rx: rx,
+            found_dependencies: Default::default(),
             search_phrase: String::default(),
             dependencies: dependency_list,
             maven_file,
@@ -97,31 +98,40 @@ impl App {
         Ok(me)
     }
 
-    fn run(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
+    async fn run(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
         while !self.exit {
             terminal.draw(|frame| ui::ui(frame, self))?;
-            let intents: Vec<Intent> = self.handle_events()?;
 
-            for intent in intents {
-                self.apply_intent(intent);
+            tokio::select! {
+                Some(intent_result) = self.intent_rx.recv() => {
+                    self.handle_intent_result(intent_result).await;
+                }
+                Ok(event) = App::read_key_async() => {
+                    if let Some(intent) = self.handle_event(event){
+                        self.apply_intent(intent);
+                    }
+                }
+
             }
         }
         Ok(())
     }
 
-    fn handle_events(&mut self) -> io::Result<Vec<Intent>> {
-        let mut intents = Vec::new();
+    async fn read_key_async() -> Result<crossterm::event::Event, std::io::Error> {
+        task::spawn_blocking(|| event::read())
+            .await
+            .expect("task panicked")
+    }
 
-        if let Event::Key(key_event) = event::read()? {
-            // it's important to check that the event is a key press event as
-            // crossterm also emits key release and repeat events on Windows.
-            if key_event.kind == KeyEventKind::Press {
-                let intent: Option<Intent> = self.handle_key_event(key_event);
-                intents.extend(intent);
-            }
+    fn handle_event(&mut self, event: Event) -> Option<Intent> {
+        // it's important to check that the event is a key press event as
+        // crossterm also emits key release and repeat events on Windows.
+        if let Some(key_event) = event.as_key_press_event() {
+            let intent: Option<Intent> = self.handle_key_event(key_event);
+            return intent;
         }
 
-        return Ok(intents);
+        return None;
     }
 
     fn handle_key_event(&mut self, key_event: KeyEvent) -> Option<Intent> {
@@ -167,6 +177,14 @@ impl App {
         return Ok(());
     }
 
+    async fn handle_intent_result(&mut self, intent_result: Effects) {
+        match intent_result {
+            Effects::DependenciesFound(search_response_docs) => {
+                self.found_dependencies.items = search_response_docs
+            }
+        };
+    }
+
     fn exit_app(&mut self) {
         self.exit = true;
     }
@@ -210,14 +228,13 @@ impl App {
     }
 
     fn find_new_dependencies(&self, search_phrase: String) {
-        let shared = Arc::clone(&self.shared);
+        let tx = self.intent_tx.clone();
 
         tokio::spawn({
             async move {
                 let found = MavenRegistry::search_dependencies(search_phrase).await?;
-                let mut guard = shared.lock().await;
-                guard.found_dependencies.items = found.response.docs;
-
+                tx.send(Effects::DependenciesFound(found.response.docs))
+                    .await?;
                 return Ok::<(), anyhow::Error>(());
             }
         });

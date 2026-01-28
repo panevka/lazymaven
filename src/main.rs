@@ -4,15 +4,11 @@ mod maven_registry;
 mod ui;
 
 use color_eyre::Result;
-use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
+use crossterm::event::{self, Event, KeyCode, KeyEvent};
 use dependency::JavaDependency;
 use maven_registry::{MavenRegistry, SearchResponseDoc};
 use ratatui::{DefaultTerminal, widgets::ListState};
-use std::{io, os::unix::process::ExitStatusExt, sync::Arc, time::Duration};
-use tokio::{
-    sync::{Mutex, mpsc},
-    task,
-};
+use tokio::{sync::mpsc, task};
 use xmltree::Error;
 
 use crate::dependency::MavenFile;
@@ -98,7 +94,7 @@ impl App {
         Ok(me)
     }
 
-    async fn run(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
+    async fn run(&mut self, terminal: &mut DefaultTerminal) -> anyhow::Result<()> {
         while !self.exit {
             terminal.draw(|frame| ui::ui(frame, self))?;
 
@@ -108,7 +104,7 @@ impl App {
                 }
                 Ok(event) = App::read_key_async() => {
                     if let Some(intent) = self.handle_event(event){
-                        self.apply_intent(intent);
+                       self.apply_intent(intent)?;
                     }
                 }
 

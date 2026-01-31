@@ -87,7 +87,7 @@ impl App {
             search_phrase: String::default(),
             dependencies: dependency_list,
             maven_file,
-            input_mode: true,
+            input_mode: false,
             exit: false,
         };
 
@@ -142,7 +142,7 @@ impl App {
 
         let intent = match key_event.code {
             KeyCode::Char('q') => Some(Intent::Exit),
-            KeyCode::Char('s') => Some(Intent::EnterInputMode),
+            KeyCode::Char('i') => Some(Intent::EnterInputMode),
             KeyCode::Char('j') => Some(Intent::NavigateDependencyList(Navigation::Next)),
             KeyCode::Char('k') => Some(Intent::NavigateDependencyList(Navigation::Previous)),
             KeyCode::Char('d') => Some(Intent::DeleteSelectedDependency),

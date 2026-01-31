@@ -68,10 +68,7 @@ pub enum Effects {
 // Core app logic
 impl App {
     fn new(maven_file: MavenFile) -> Result<Self, Error> {
-        let dependencies = {
-            let deps = maven_file.get_dependencies()?;
-            deps
-        };
+        let dependencies = maven_file.get_dependencies()?;
 
         let dependency_list = DependencyList {
             items: dependencies,

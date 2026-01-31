@@ -23,6 +23,7 @@ async fn main() -> Result<(), anyhow::Error> {
     return Ok(());
 }
 
+#[derive(Default)]
 pub struct DependencyList {
     items: Vec<JavaDependency>,
     state: ListState,
@@ -68,13 +69,6 @@ pub enum Effects {
 // Core app logic
 impl App {
     fn new(maven_file: MavenFile) -> Result<Self, Error> {
-        let dependencies = maven_file.get_dependencies()?;
-
-        let dependency_list = DependencyList {
-            items: dependencies,
-            state: ListState::default(),
-        };
-
         let (tx, rx) = mpsc::channel::<Effects>(100);
 
         let me = Self {
@@ -82,7 +76,7 @@ impl App {
             intent_rx: rx,
             found_dependencies: Default::default(),
             search_phrase: String::default(),
-            dependencies: dependency_list,
+            dependencies: Default::default(),
             maven_file,
             input_mode: false,
             exit: false,
@@ -91,7 +85,18 @@ impl App {
         Ok(me)
     }
 
+    fn init(&mut self) -> anyhow::Result<()> {
+        let maven_file = MavenFile::search_project_maven_file()?;
+        let dependencies = maven_file.get_dependencies()?;
+
+        self.dependencies.items = dependencies;
+
+        return Ok(());
+    }
+
     async fn run(&mut self, terminal: &mut DefaultTerminal) -> anyhow::Result<()> {
+        self.init()?;
+
         while !self.exit {
             terminal.draw(|frame| ui::ui(frame, self))?;
 

@@ -56,7 +56,7 @@ pub enum Effects {
 
 // Core app logic
 impl App {
-    pub fn new(maven_file: MavenFile) -> Result<Self, Error> {
+    pub fn new() -> Result<Self, Error> {
         let (tx, rx) = mpsc::channel::<Effects>(100);
 
         let me = Self {
@@ -65,7 +65,7 @@ impl App {
             found_dependencies: Default::default(),
             search_phrase: String::default(),
             dependencies: Default::default(),
-            maven_file,
+            maven_file: Default::default(),
             input_mode: false,
             exit: false,
         };

@@ -130,3 +130,12 @@ impl ElementPredicate for &JavaDependency {
         dependency == **self
     }
 }
+
+impl Default for MavenFile {
+    fn default() -> Self {
+        return Self {
+            root: Element::new(""),
+            file_path: Default::default(),
+        };
+    }
+}

@@ -207,7 +207,13 @@ impl App {
     }
 
     fn update_input(&mut self, key_code: KeyCode) {
-        self.search_phrase = String::from(format!("{}{}", self.search_phrase, key_code));
+        if let Some(char) = key_code.as_char() {
+            self.search_phrase = String::from(format!("{}{}", self.search_phrase, char));
+        }
+
+        if key_code.is_backspace() {
+            self.search_phrase.pop();
+        }
     }
 
     fn delete_selected_dependency(&mut self) {

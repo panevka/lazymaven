@@ -166,7 +166,10 @@ impl App {
             Intent::NavigateDependencyList(direction) => self.navigate_dependency_list(direction),
             Intent::SubmitDependencyChanges => self.submit_dependency_changes()?,
             Intent::DeleteSelectedDependency => self.delete_selected_dependency(),
-            Intent::UpdateInput(key_code) => self.update_input(key_code),
+            Intent::UpdateInput(key_code) => {
+                let new_text = self.handle_input(self.search_phrase.clone(), key_code);
+                self.search_phrase = new_text;
+            }
             Intent::FindNewDependencies(search_phrase) => self.find_new_dependencies(search_phrase),
         }
 
@@ -206,14 +209,16 @@ impl App {
         }
     }
 
-    fn update_input(&mut self, key_code: KeyCode) {
+    fn handle_input(&self, text: String, key_code: KeyCode) -> String {
+        let mut updated_text = text.clone();
+
         if let Some(char) = key_code.as_char() {
-            self.search_phrase = String::from(format!("{}{}", self.search_phrase, char));
+            updated_text = String::from(format!("{}{}", updated_text, char));
+        } else if key_code.is_backspace() {
+            updated_text.pop();
         }
 
-        if key_code.is_backspace() {
-            self.search_phrase.pop();
-        }
+        return updated_text;
     }
 
     fn delete_selected_dependency(&mut self) {

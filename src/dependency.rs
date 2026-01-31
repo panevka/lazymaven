@@ -86,6 +86,12 @@ impl MavenFile {
             .root
             .write(File::create_new(current_xml_file_path).unwrap());
     }
+
+    pub fn search_project_maven_file() -> anyhow::Result<MavenFile> {
+        // TODO: implement actual search functionality
+        let maven = MavenFile::from_file("./static/pom.xml".to_string())?;
+        return Ok(maven);
+    }
 }
 
 impl<'a> JavaDependency {

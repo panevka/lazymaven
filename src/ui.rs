@@ -3,7 +3,7 @@ use ratatui::{
     Frame,
     layout::{Constraint, Direction, Margin},
     style::{Color, Modifier, Style, Stylize, palette::tailwind::SLATE},
-    text::{Line, Span},
+    text::Line,
     widgets::{Block, HighlightSpacing, List, ListItem},
 };
 

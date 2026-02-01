@@ -145,15 +145,13 @@ impl AppExecutor {
     }
 
     fn handle_input(text: &mut String, key_code: KeyCode) {
-        let mut updated_text = text.clone();
-
-        if let Some(char) = key_code.as_char() {
-            updated_text = String::from(format!("{}{}", updated_text, char));
-        } else if key_code.is_backspace() {
-            updated_text.pop();
-        }
-
-        *text = updated_text;
+        match key_code {
+            KeyCode::Backspace => {
+                text.pop();
+            }
+            KeyCode::Char(char) => text.push(char),
+            _ => (),
+        };
     }
 
     fn delete_selected_dependency(state: &mut AppState) {

@@ -1,3 +1,4 @@
+use anyhow::Result;
 use crossterm::event::{Event, KeyCode, KeyEvent};
 use tokio::sync::mpsc;
 
@@ -175,10 +176,7 @@ impl AppExecutor {
 pub struct AppAsyncOrchestrator {}
 
 impl AppAsyncOrchestrator {
-    pub async fn handle_async_event(
-        effect: Effect,
-        tx: mpsc::Sender<AppEvent>,
-    ) -> anyhow::Result<()> {
+    pub async fn handle_async_event(effect: Effect, tx: mpsc::Sender<AppEvent>) -> Result<()> {
         let result = match effect {
             Effect::SearchMaven(search_phrase) => Self::search_maven(search_phrase),
         };
@@ -192,9 +190,7 @@ impl AppAsyncOrchestrator {
         return Ok(());
     }
 
-    fn search_maven(
-        search_phrase: String,
-    ) -> impl Future<Output = Result<MavenResponse, anyhow::Error>> {
+    fn search_maven(search_phrase: String) -> impl Future<Output = Result<MavenResponse>> {
         let result = MavenRegistry::search_dependencies(search_phrase);
         return result;
     }

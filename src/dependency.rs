@@ -1,9 +1,8 @@
-use io::Error;
+use anyhow::{Context, Error, Result};
 use std::{
     fs::{self, File},
     io::{self, ErrorKind},
 };
-
 use xmltree::{Element, ElementPredicate};
 
 #[derive(Debug, Clone)]
@@ -20,7 +19,7 @@ pub struct JavaDependency {
 }
 
 impl MavenFile {
-    pub fn from_file(file_path: String) -> Result<Self, std::io::Error> {
+    pub fn from_file(file_path: String) -> Result<Self> {
         let file_content: String = fs::read_to_string(&file_path)?;
 
         let xml_tree_root: Element = Element::parse(file_content.as_bytes())
@@ -33,11 +32,8 @@ impl MavenFile {
         });
     }
 
-    pub fn get_dependencies(&self) -> Result<Vec<JavaDependency>, Error> {
-        let dependencies_root: &Element = self.root.get_child("dependencies").ok_or(Error::new(
-            ErrorKind::Other,
-            "could not find dependencies element",
-        ))?;
+    pub fn get_dependencies(&self) -> Option<Vec<JavaDependency>> {
+        let dependencies_root: &Element = self.root.get_child("dependencies")?;
 
         let dependencies: Vec<JavaDependency> = dependencies_root
             .children
@@ -46,17 +42,17 @@ impl MavenFile {
             .map(|dependency| JavaDependency::from_element(dependency))
             .collect();
 
-        Ok(dependencies)
+        return Some(dependencies);
     }
 
     pub fn update_dependencies(
         &mut self,
         updated_dependencies: &Vec<JavaDependency>,
-    ) -> Result<(), Error> {
-        let dependencies_root = self.root.get_mut_child("dependencies").ok_or(Error::new(
-            ErrorKind::Other,
-            "could not find dependencies element",
-        ))?;
+    ) -> Result<()> {
+        let dependencies_root = self
+            .root
+            .get_mut_child("dependencies")
+            .context("no dependencies root")?;
 
         dependencies_root.children.retain(|child| {
             child
@@ -87,7 +83,7 @@ impl MavenFile {
             .write(File::create_new(current_xml_file_path).unwrap());
     }
 
-    pub fn search_project_maven_file() -> anyhow::Result<MavenFile> {
+    pub fn search_project_maven_file() -> Result<MavenFile> {
         // TODO: implement actual search functionality
         let maven = MavenFile::from_file("./static/pom.xml".to_string())?;
         return Ok(maven);

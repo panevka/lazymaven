@@ -41,7 +41,7 @@ impl MavenRegistry {
         )
     }
 
-    pub async fn search_dependencies(search_phrase: String) -> Result<MavenResponse, Error> {
+    pub async fn search_dependencies(search_phrase: String) -> Result<MavenResponse> {
         let client = reqwest::Client::new();
 
         let request_url = MavenRegistry::api_search_preview_url(search_phrase, 20);

@@ -1,9 +1,8 @@
-use color_eyre::Result;
+use anyhow::{Context, Error, Result};
 use dependency::JavaDependency;
 use maven_registry::SearchResponseDoc;
-use ratatui::{DefaultTerminal, widgets::ListState};
+use ratatui::DefaultTerminal;
 use tokio::sync::mpsc;
-use xmltree::Error;
 
 use crate::{
     dependency::{self, MavenFile},
@@ -56,15 +55,17 @@ impl App {
         Ok(me)
     }
 
-    fn init(&mut self) -> anyhow::Result<()> {
+    fn init(&mut self) -> Result<()> {
         let maven_file = MavenFile::search_project_maven_file()?;
-        let dependencies = maven_file.get_dependencies()?;
+        let dependencies = maven_file
+            .get_dependencies()
+            .context("no dependencies found")?;
         self.state.dependencies.items = dependencies;
         self.spawn_input_task(self.tx.clone());
         return Ok(());
     }
 
-    pub async fn run(&mut self, terminal: &mut DefaultTerminal) -> anyhow::Result<()> {
+    pub async fn run(&mut self, terminal: &mut DefaultTerminal) -> Result<()> {
         self.init()?;
         let mut effects: Vec<Effect> = vec![];
 

@@ -1,6 +1,7 @@
 mod app;
 mod dependency;
 mod events;
+mod list;
 mod maven_registry;
 mod ui;
 

@@ -12,7 +12,7 @@ pub struct MavenFile {
     file_path: String,
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Default)]
 pub struct JavaDependency {
     pub group_id: String,
     pub artifact_id: String,

@@ -1,5 +1,4 @@
 use color_eyre::Result;
-use crossterm::event::{self};
 use dependency::JavaDependency;
 use maven_registry::SearchResponseDoc;
 use ratatui::{DefaultTerminal, widgets::ListState};
@@ -11,20 +10,9 @@ use crate::{
     events::{
         self, AppAsyncOrchestrator, AppEvent, AppExecutor, AppIntentHandler, Effect, EventContext,
     },
+    list::List,
     maven_registry, ui,
 };
-
-#[derive(Default, Clone)]
-pub struct DependencyList {
-    pub items: Vec<JavaDependency>,
-    pub state: ListState,
-}
-
-#[derive(Default, Clone)]
-pub struct FoundDependencyList {
-    pub items: Vec<SearchResponseDoc>,
-    pub state: ListState,
-}
 
 pub struct App {
     tx: mpsc::Sender<events::AppEvent>,
@@ -38,20 +26,14 @@ pub struct AppState {
     pub mode: InteractionMode,
     pub exit: bool,
     pub search_phrase: String,
-    pub found_dependencies: FoundDependencyList,
-    pub dependencies: DependencyList,
+    pub found_dependencies: List<SearchResponseDoc>,
+    pub dependencies: List<JavaDependency>,
 }
 
 #[derive(Copy, Clone, Debug)]
 pub enum InteractionMode {
     Normal,
     Input,
-}
-
-#[derive(Debug)]
-pub enum Navigation {
-    Previous,
-    Next,
 }
 
 impl App {

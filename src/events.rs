@@ -2,7 +2,8 @@ use crossterm::event::{Event, KeyCode, KeyEvent};
 use tokio::sync::mpsc;
 
 use crate::{
-    app::{AppState, InteractionMode, Navigation},
+    app::{AppState, InteractionMode},
+    list::{List, Navigation},
     maven_registry::{MavenRegistry, MavenResponse, SearchResponseDoc},
 };
 
@@ -106,7 +107,7 @@ impl AppExecutor {
                 Self::submit_dependency_changes(state);
             }
             AppEvent::User(Intent::NavigateDependencyList(direction)) => {
-                Self::navigate_dependency_list(state, direction);
+                Self::navigate_list(&mut state.dependencies, direction);
             }
             AppEvent::User(Intent::FindNewDependencies(search_phrase)) => {
                 let effect = Self::find_new_dependencies(search_phrase);
@@ -139,11 +140,8 @@ impl AppExecutor {
         // TODO Send event on success and / or on error.
     }
 
-    fn navigate_dependency_list(state: &mut AppState, direction: Navigation) {
-        match direction {
-            Navigation::Next => state.dependencies.state.select_next(),
-            Navigation::Previous => state.dependencies.state.select_previous(),
-        }
+    fn navigate_list<T>(list: &mut List<T>, direction: Navigation) {
+        list.navigate(direction);
     }
 
     fn handle_input(text: &mut String, key_code: KeyCode) {

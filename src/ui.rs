@@ -1,26 +1,26 @@
-use crate::{App, dependency::JavaDependency, maven_registry::SearchResponseDoc};
+use crate::{app::AppState, dependency::JavaDependency, maven_registry::SearchResponseDoc, App};
 use ratatui::{
-    Frame,
     layout::{Constraint, Direction, Margin},
-    style::{Color, Modifier, Style, Stylize, palette::tailwind::SLATE},
+    style::{palette::tailwind::SLATE, Color, Modifier, Style, Stylize},
     text::Line,
     widgets::{Block, HighlightSpacing, List, ListItem},
+    Frame,
 };
 
 const NORMAL_ROW_BG: Color = SLATE.c950;
 const ALT_ROW_BG_COLOR: Color = SLATE.c900;
 const SELECTED_STYLE: Style = Style::new().bg(SLATE.c800).add_modifier(Modifier::BOLD);
 
-pub fn ui(f: &mut Frame, app: &mut App) {
+pub fn ui(f: &mut Frame, app_state: &mut AppState) {
     let chunks = ratatui::layout::Layout::default()
         .direction(Direction::Horizontal)
         .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
         .split(f.area());
 
-    let list = render_list(&app.dependencies.items);
-    let search = render_search(&app.search_phrase);
+    let list = render_list(&app_state.dependencies.items);
+    let search = render_search(&app_state.search_phrase);
 
-    f.render_stateful_widget(list, chunks[0], &mut app.dependencies.state);
+    f.render_stateful_widget(list, chunks[0], &mut app_state.dependencies.state);
     f.render_widget(&search, chunks[1]);
 
     let search_results = chunks[1].inner(Margin {
@@ -28,7 +28,7 @@ pub fn ui(f: &mut Frame, app: &mut App) {
         vertical: 10,
     });
 
-    let deps = &mut app.found_dependencies;
+    let deps = &mut app_state.found_dependencies;
     let found_dependencies = render_found_dependencies(&deps.items);
 
     f.render_stateful_widget(found_dependencies, search_results, &mut deps.state);

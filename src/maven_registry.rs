@@ -13,7 +13,7 @@ pub struct SearchResponse {
     pub docs: Vec<SearchResponseDoc>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all(serialize = "camelCase", deserialize = "camelCase"))]
 pub struct SearchResponseDoc {
     pub id: String,

@@ -6,13 +6,13 @@ use std::{
 
 use xmltree::{Element, ElementPredicate};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct MavenFile {
     root: Element,
     file_path: String,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct JavaDependency {
     pub group_id: String,
     pub artifact_id: String,

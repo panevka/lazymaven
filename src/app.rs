@@ -36,7 +36,7 @@ pub enum InteractionMode {
 }
 
 impl App {
-    pub fn new() -> Result<Self, Error> {
+    pub fn new() -> Result<Self> {
         let (tx, rx) = mpsc::channel::<events::AppEvent>(100);
 
         let me = Self {

@@ -8,7 +8,9 @@ use xmltree::Error;
 
 use crate::{
     dependency::{self, MavenFile},
-    events::{self, AppEvent, AppExecutor, AppIntentHandler, EventContext},
+    events::{
+        self, AppAsyncOrchestrator, AppEvent, AppExecutor, AppIntentHandler, Effect, EventContext,
+    },
     maven_registry, ui,
 };
 
@@ -40,7 +42,7 @@ pub struct AppState {
     pub dependencies: DependencyList,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub enum InteractionMode {
     Normal,
     Input,
@@ -82,12 +84,34 @@ impl App {
 
     pub async fn run(&mut self, terminal: &mut DefaultTerminal) -> anyhow::Result<()> {
         self.init()?;
+        let mut effects: Vec<Effect> = vec![];
 
         while !self.state.exit {
             terminal.draw(|frame| ui::ui(frame, &mut self.state))?;
 
+            for effect in effects.drain(..) {
+                tokio::spawn(AppAsyncOrchestrator::handle_async_event(
+                    effect,
+                    self.tx.clone(),
+                ));
+            }
+
             if let Some(event) = self.rx.recv().await {
-                AppExecutor::handle_intent(event, &mut self.state);
+                match event {
+                    AppEvent::Raw(ev) => {
+                        let ctx = EventContext::from(&self.state);
+                        if let Some(intent) = AppIntentHandler::event_to_intent(ev, ctx) {
+                            AppExecutor::handle_intent(
+                                AppEvent::User(intent),
+                                &mut self.state,
+                                &mut effects,
+                            );
+                        }
+                    }
+                    other => {
+                        AppExecutor::handle_intent(other, &mut self.state, &mut effects);
+                    }
+                }
             }
         }
 
@@ -95,7 +119,6 @@ impl App {
     }
 
     fn spawn_input_task(&self, tx: mpsc::Sender<AppEvent>) {
-        let state = self.state.clone(); // clone if needed inside async move
         tokio::spawn(async move {
             loop {
                 let event = match tokio::task::spawn_blocking(crossterm::event::read)
@@ -109,12 +132,8 @@ impl App {
                     }
                 };
 
-                let event_context = EventContext::from(&state);
-
-                if let Some(intent) = AppIntentHandler::event_to_intent(event, event_context) {
-                    if let Err(e) = tx.send(AppEvent::User(intent)).await {
-                        eprintln!("Failed to send AppEvent: {:?}", e);
-                    }
+                if let Err(e) = tx.send(AppEvent::Raw(event)).await {
+                    eprintln!("Failed to send raw AppEvent: {:?}", e);
                 }
             }
         });

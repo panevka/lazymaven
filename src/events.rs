@@ -1,24 +1,28 @@
 use crossterm::event::{Event, KeyCode, KeyEvent};
+use tokio::sync::mpsc;
 
 use crate::{
     app::{AppState, InteractionMode, Navigation},
-    maven_registry::SearchResponseDoc,
+    maven_registry::{MavenRegistry, MavenResponse, SearchResponseDoc},
 };
 
 pub struct EventContext {
     pub mode: InteractionMode,
+    pub search_phrase: String,
 }
 
 impl EventContext {
     pub fn from(app_state: &AppState) -> Self {
         Self {
             mode: app_state.mode,
+            search_phrase: app_state.search_phrase.clone(),
         }
     }
 }
 
 #[derive(Debug)]
 pub enum AppEvent {
+    Raw(Event),
     User(Intent),
     Async(AsyncEvent),
 }
@@ -37,7 +41,12 @@ pub enum Intent {
 
 #[derive(Debug)]
 pub enum AsyncEvent {
-    MavenSearchSucceeded(Vec<SearchResponseDoc>),
+    MavenDependenciesFound(Vec<SearchResponseDoc>),
+}
+
+#[derive(Debug)]
+pub enum Effect {
+    SearchMaven(String),
 }
 
 pub struct AppIntentHandler {}
@@ -69,6 +78,7 @@ impl AppIntentHandler {
             KeyCode::Char('k') => Intent::NavigateDependencyList(Navigation::Previous),
             KeyCode::Char('d') => Intent::DeleteSelectedDependency,
             KeyCode::Char('a') => Intent::SubmitDependencyChanges,
+            KeyCode::Char('w') => Intent::FindNewDependencies(ctx.search_phrase),
             _ => return None,
         };
 
@@ -79,10 +89,12 @@ impl AppIntentHandler {
 pub struct AppExecutor {}
 
 impl AppExecutor {
-    pub fn handle_intent(event: AppEvent, state: &mut AppState) {
+    pub fn handle_intent(event: AppEvent, state: &mut AppState, effects: &mut Vec<Effect>) {
         match event {
             AppEvent::User(Intent::Exit) => Self::exit_app(state),
-            AppEvent::User(Intent::EnterInputMode) => Self::enter_input_mode(state),
+            AppEvent::User(Intent::EnterInputMode) => {
+                Self::enter_input_mode(state);
+            }
             AppEvent::User(Intent::LeaveInputMode) => Self::leave_input_mode(state),
             AppEvent::User(Intent::DeleteSelectedDependency) => {
                 Self::delete_selected_dependency(state)
@@ -97,11 +109,14 @@ impl AppExecutor {
                 Self::navigate_dependency_list(state, direction);
             }
             AppEvent::User(Intent::FindNewDependencies(search_phrase)) => {
-                // TODO handle find new dependenices event without spawning within the app executor
-                // Self::find_new_dependencies(search_phrase);
+                let effect = Self::find_new_dependencies(search_phrase);
+                effects.push(effect);
             }
-            _ => state.exit = true,
-        }
+            AppEvent::Async(AsyncEvent::MavenDependenciesFound(dependencies)) => {
+                state.found_dependencies.items = dependencies;
+            }
+            _ => (),
+        };
     }
 
     fn exit_app(state: &mut AppState) {
@@ -156,18 +171,35 @@ impl AppExecutor {
         }
     }
 
-    // fn find_new_dependencies(&self, search_phrase: String) {
-    //     let tx = self.tx.clone();
+    fn find_new_dependencies(search_phrase: String) -> Effect {
+        return Effect::SearchMaven(search_phrase);
+    }
+}
 
-    //     tokio::spawn({
-    //         async move {
-    //             let found = MavenRegistry::search_dependencies(search_phrase).await?;
-    //             tx.send(AppEvent::DependenciesFound(found.response.docs))
-    //                 .await?;
-    //             return Ok::<(), anyhow::Error>(());
-    //         }
-    //     });
+pub struct AppAsyncOrchestrator {}
 
-    //     return ();
-    // }
+impl AppAsyncOrchestrator {
+    pub async fn handle_async_event(
+        effect: Effect,
+        tx: mpsc::Sender<AppEvent>,
+    ) -> anyhow::Result<()> {
+        let result = match effect {
+            Effect::SearchMaven(search_phrase) => Self::search_maven(search_phrase),
+        };
+
+        let response = result.await?.response.docs;
+
+        let event = AppEvent::Async(AsyncEvent::MavenDependenciesFound(response));
+
+        tx.send(event).await?;
+
+        return Ok(());
+    }
+
+    fn search_maven(
+        search_phrase: String,
+    ) -> impl Future<Output = Result<MavenResponse, anyhow::Error>> {
+        let result = MavenRegistry::search_dependencies(search_phrase);
+        return result;
+    }
 }

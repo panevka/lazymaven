@@ -7,16 +7,16 @@ use crate::{
     maven_registry::{MavenRegistry, MavenResponse, SearchResponseDoc},
 };
 
-pub struct EventContext {
+pub struct EventContext<'a> {
     pub mode: InteractionMode,
-    pub search_phrase: String,
+    pub search_phrase: &'a String,
 }
 
-impl EventContext {
-    pub fn from(app_state: &AppState) -> Self {
+impl<'a> EventContext<'a> {
+    pub fn from(app_state: &'a AppState) -> Self {
         Self {
             mode: app_state.mode,
-            search_phrase: app_state.search_phrase.clone(),
+            search_phrase: &app_state.search_phrase,
         }
     }
 }
@@ -79,7 +79,7 @@ impl AppIntentHandler {
             KeyCode::Char('k') => Intent::NavigateDependencyList(Navigation::Previous),
             KeyCode::Char('d') => Intent::DeleteSelectedDependency,
             KeyCode::Char('a') => Intent::SubmitDependencyChanges,
-            KeyCode::Char('w') => Intent::FindNewDependencies(ctx.search_phrase),
+            KeyCode::Char('w') => Intent::FindNewDependencies(ctx.search_phrase.to_string()),
             _ => return None,
         };
 

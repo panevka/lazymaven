@@ -52,8 +52,6 @@ impl AppIntentHandler {
         return intent;
     }
 
-    pub fn spawn_input_handler() {}
-
     fn handle_key_event(key_event: KeyEvent, ctx: EventContext) -> Option<Intent> {
         if let InteractionMode::Input = ctx.mode {
             let intent = match key_event.code {

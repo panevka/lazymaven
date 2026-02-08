@@ -1,6 +1,6 @@
 use ratatui::widgets::ListState;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Navigation {
     Previous,
     Next,

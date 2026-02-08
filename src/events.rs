@@ -1,5 +1,6 @@
 use anyhow::Result;
 use crossterm::event::{Event, KeyCode, KeyEvent};
+use std::collections::HashMap;
 use tokio::sync::mpsc;
 
 use crate::{
@@ -29,7 +30,7 @@ pub enum AppEvent {
     Async(AsyncEvent),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Intent {
     Exit,
     EnterInputMode,
@@ -51,7 +52,36 @@ pub enum Effect {
     SearchMaven(String),
 }
 
+trait IntentMapping {
+    fn get_mapping(ctx: EventContext) -> HashMap<KeyCode, Intent>;
+}
+
 pub struct AppIntentHandler {}
+
+impl IntentMapping for AppIntentHandler {
+    fn get_mapping(ctx: EventContext) -> HashMap<KeyCode, Intent> {
+        let default_mapping = HashMap::from([
+            (KeyCode::Char('q'), Intent::Exit),
+            (KeyCode::Char('i'), Intent::EnterInputMode),
+            (
+                KeyCode::Char('j'),
+                Intent::NavigateDependencyList(Navigation::Next),
+            ),
+            (
+                KeyCode::Char('k'),
+                Intent::NavigateDependencyList(Navigation::Previous),
+            ),
+            (KeyCode::Char('d'), Intent::DeleteSelectedDependency),
+            (KeyCode::Char('a'), Intent::SubmitDependencyChanges),
+            (
+                KeyCode::Char('w'),
+                Intent::FindNewDependencies(ctx.search_phrase.to_string()),
+            ),
+        ]);
+
+        return default_mapping;
+    }
+}
 
 impl AppIntentHandler {
     pub fn event_to_intent(event: Event, ctx: EventContext) -> Option<Intent> {
@@ -73,18 +103,11 @@ impl AppIntentHandler {
             return intent;
         }
 
-        let intent = match key_event.code {
-            KeyCode::Char('q') => Intent::Exit,
-            KeyCode::Char('i') => Intent::EnterInputMode,
-            KeyCode::Char('j') => Intent::NavigateDependencyList(Navigation::Next),
-            KeyCode::Char('k') => Intent::NavigateDependencyList(Navigation::Previous),
-            KeyCode::Char('d') => Intent::DeleteSelectedDependency,
-            KeyCode::Char('a') => Intent::SubmitDependencyChanges,
-            KeyCode::Char('w') => Intent::FindNewDependencies(ctx.search_phrase.to_string()),
-            _ => return None,
-        };
+        let mapping = Self::get_mapping(ctx);
 
-        return Some(intent);
+        let intent = mapping.get(&key_event.code)?;
+
+        return Some(intent.clone());
     }
 }
 

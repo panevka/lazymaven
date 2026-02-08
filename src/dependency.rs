@@ -1,7 +1,7 @@
-use anyhow::{Context, Error, Result};
+use anyhow::{Context, Result};
 use std::{
     fs::{self, File},
-    io::{self, ErrorKind},
+    io::{self},
 };
 use xmltree::{Element, ElementPredicate};
 

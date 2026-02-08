@@ -1,4 +1,4 @@
-use anyhow::{Context, Error, Result};
+use anyhow::{Context, Result};
 use dependency::JavaDependency;
 use maven_registry::SearchResponseDoc;
 use ratatui::DefaultTerminal;
@@ -11,12 +11,14 @@ use crate::{
     },
     list::List,
     maven_registry, ui,
+    views::Views,
 };
 
 pub struct App {
     tx: mpsc::Sender<events::AppEvent>,
     rx: mpsc::Receiver<events::AppEvent>,
     state: AppState,
+    views: Views,
 }
 
 #[derive(Clone)]
@@ -42,6 +44,7 @@ impl App {
         let me = Self {
             tx,
             rx,
+            views: Views::new(),
             state: AppState {
                 found_dependencies: Default::default(),
                 search_phrase: String::default(),
@@ -61,6 +64,7 @@ impl App {
             .get_dependencies()
             .context("no dependencies found")?;
         self.state.dependencies.items = dependencies;
+        self.state.dependencies.state.select_first();
         self.spawn_input_task(self.tx.clone());
         return Ok(());
     }
@@ -70,7 +74,7 @@ impl App {
         let mut effects: Vec<Effect> = vec![];
 
         while !self.state.exit {
-            terminal.draw(|frame| ui::ui(frame, &mut self.state))?;
+            terminal.draw(|frame| ui::ui(frame, &mut self.state, &self.views))?;
 
             for effect in effects.drain(..) {
                 tokio::spawn(AppAsyncOrchestrator::handle_async_event(

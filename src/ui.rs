@@ -1,31 +1,32 @@
 use crate::{
-    app::AppState,
-    views::{ViewId, Views},
+    app::{UIState, Data},
+    views::{View, ViewId, dependency_view::DependencyView, dependency_search_view::DependencySearchView}
 };
 use ratatui::{
     Frame,
     layout::{Constraint, Direction},
     style::{Color, palette::tailwind::SLATE},
 };
+use std::collections::BTreeMap;
 
 const NORMAL_ROW_BG: Color = SLATE.c950;
 const ALT_ROW_BG_COLOR: Color = SLATE.c900;
 
-pub fn ui(f: &mut Frame, app_state: &mut AppState, views: &Views) {
-    let chunks = ratatui::layout::Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
-        .split(f.area());
+pub struct UI;
 
-    let mut buffer = f.buffer_mut();
+impl UI {
+    pub fn render(f: &mut Frame, ui_state: &mut UIState, app_state: &Data) {
+        let chunks = ratatui::layout::Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+            .split(f.area());
 
-    views.render(ViewId::DependencyView, &mut buffer, chunks[0], app_state);
-    views.render(
-        ViewId::DependencySearchView,
-        &mut buffer,
-        chunks[1],
-        app_state,
-    );
+        let views: &Vec<(ViewId, Box<dyn View>)> = &app_state.views;
+
+        let mut buffer = f.buffer_mut();
+
+        views[0].1.render(buffer, chunks[0], app_state, ui_state);
+    }
 }
 
 pub fn alternate_colors(i: usize) -> Color {
@@ -34,4 +35,10 @@ pub fn alternate_colors(i: usize) -> Color {
     } else {
         ALT_ROW_BG_COLOR
     }
+}
+
+#[derive(Debug, Clone)]
+pub enum Navigation {
+    Next,
+    Previous,
 }

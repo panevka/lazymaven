@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use dependency::JavaDependency;
 use maven_registry::SearchResponseDoc;
-use ratatui::DefaultTerminal;
+use ratatui::{DefaultTerminal, widgets::ListState};
 use tokio::sync::mpsc;
 
 use crate::{
@@ -9,26 +9,37 @@ use crate::{
     events::{
         self, AppAsyncOrchestrator, AppEvent, AppExecutor, AppIntentHandler, Effect, EventContext,
     },
-    list::List,
-    maven_registry, ui,
-    views::Views,
+    maven_registry,
+    ui,
+    ui::{UI},
+    views::{View, ViewId, dependency_view::DependencyView, dependency_search_view::DependencySearchView}
 };
 
 pub struct App {
     tx: mpsc::Sender<events::AppEvent>,
     rx: mpsc::Receiver<events::AppEvent>,
     state: AppState,
-    views: Views,
 }
 
-#[derive(Clone)]
 pub struct AppState {
-    pub maven_file: MavenFile,
+    pub ui_state: UIState,
+    pub data: Data,
+}
+
+pub struct UIState {
+    pub currently_focused_view: ViewId,
+    pub dependency_list_state: ListState,
+    pub search_list_state: ListState,
+}
+
+pub struct Data {
+    pub views: Vec<(ViewId, Box<dyn View>)>,
     pub mode: InteractionMode,
-    pub exit: bool,
+    pub maven_file: MavenFile,
     pub search_phrase: String,
-    pub found_dependencies: List<SearchResponseDoc>,
-    pub dependencies: List<JavaDependency>,
+    pub found_dependencies: Vec<SearchResponseDoc>,
+    pub dependencies: Vec<JavaDependency>,
+    pub exit: bool,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -44,15 +55,25 @@ impl App {
         let me = Self {
             tx,
             rx,
-            views: Views::new(),
             state: AppState {
-                found_dependencies: Default::default(),
-                search_phrase: String::default(),
-                dependencies: Default::default(),
-                maven_file: Default::default(),
-                mode: InteractionMode::Normal,
-                exit: false,
-            },
+                ui_state: UIState {
+                    dependency_list_state: Default::default(),
+                    search_list_state: Default::default(),
+                    currently_focused_view: ViewId::DependencyView,
+                },
+                data: Data {
+                    views: vec![
+                        (ViewId::DependencyView, Box::new(DependencyView{})),
+                        (ViewId::DependencySearchView, Box::new(DependencySearchView{}))
+                    ],
+                    mode: InteractionMode::Normal,
+                    found_dependencies: Default::default(),
+                    search_phrase: String::default(),
+                    dependencies: Default::default(),
+                    maven_file: Default::default(),
+                    exit: false,
+                },
+            }
         };
 
         Ok(me)
@@ -63,8 +84,8 @@ impl App {
         let dependencies = maven_file
             .get_dependencies()
             .context("no dependencies found")?;
-        self.state.dependencies.items = dependencies;
-        self.state.dependencies.state.select_first();
+        self.state.data.dependencies = dependencies;
+        self.state.ui_state.dependency_list_state.select_first();
         self.spawn_input_task(self.tx.clone());
         return Ok(());
     }
@@ -73,8 +94,8 @@ impl App {
         self.init()?;
         let mut effects: Vec<Effect> = vec![];
 
-        while !self.state.exit {
-            terminal.draw(|frame| ui::ui(frame, &mut self.state, &self.views))?;
+        while !self.state.data.exit {
+            terminal.draw(|frame| UI::render(frame, &mut self.state.ui_state, &self.state.data))?;
 
             for effect in effects.drain(..) {
                 tokio::spawn(AppAsyncOrchestrator::handle_async_event(

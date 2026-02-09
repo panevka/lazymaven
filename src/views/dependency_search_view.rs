@@ -6,14 +6,15 @@ use ratatui::{
     widgets::{Block, HighlightSpacing, List, ListItem, StatefulWidget, Widget},
 };
 
-use crate::{app::AppState, ui::alternate_colors};
+use crate::{app::{Data, UIState}, ui::alternate_colors, views::View};
 
 const SELECTED_STYLE: Style = Style::new().bg(SLATE.c800).add_modifier(Modifier::BOLD);
 
-pub struct DependencySearchView {}
+pub struct DependencySearchView;
 
-impl DependencySearchView {
-    pub fn render(&self, buffer: &mut Buffer, area: Rect, state: &mut AppState) {
+impl View for DependencySearchView {
+
+    fn render(&self, buffer: &mut Buffer, area: Rect, state: &Data, ui_state: &mut UIState) {
         let layout = Layout::default()
             .direction(Direction::Vertical)
             .constraints(vec![
@@ -31,7 +32,6 @@ impl DependencySearchView {
 
         let items: Vec<ListItem> = state
             .found_dependencies
-            .items
             .iter()
             .enumerate()
             .map(|(i, dependency)| {
@@ -47,6 +47,7 @@ impl DependencySearchView {
             .highlight_symbol(">")
             .highlight_spacing(HighlightSpacing::Always);
 
-        StatefulWidget::render(list, layout[2], buffer, &mut state.found_dependencies.state);
+        StatefulWidget::render(list, layout[2], buffer, &mut ui_state.search_list_state);
     }
+
 }

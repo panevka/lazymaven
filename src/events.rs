@@ -4,9 +4,10 @@ use std::collections::HashMap;
 use tokio::sync::mpsc;
 
 use crate::{
-    app::{AppState, InteractionMode},
-    list::{List, Navigation},
+    app::{AppState, UIState, InteractionMode},
     maven_registry::{MavenRegistry, MavenResponse, SearchResponseDoc},
+    views::ViewId,
+    ui::Navigation,
 };
 
 pub struct EventContext<'a> {
@@ -17,8 +18,8 @@ pub struct EventContext<'a> {
 impl<'a> EventContext<'a> {
     pub fn from(app_state: &'a AppState) -> Self {
         Self {
-            mode: app_state.mode,
-            search_phrase: &app_state.search_phrase,
+            mode: app_state.data.mode,
+            search_phrase: &app_state.data.search_phrase,
         }
     }
 }
@@ -40,6 +41,8 @@ pub enum Intent {
     DeleteSelectedDependency,
     NavigateDependencyList(Navigation),
     FindNewDependencies(String),
+    FocusNextView,
+    FocusPreviousView
 }
 
 #[derive(Debug)]
@@ -77,6 +80,8 @@ impl IntentMapping for AppIntentHandler {
                 KeyCode::Char('w'),
                 Intent::FindNewDependencies(ctx.search_phrase.to_string()),
             ),
+            (KeyCode::Tab, Intent::FocusNextView),
+            (KeyCode::BackTab, Intent::FocusPreviousView),
         ]);
 
         return default_mapping;
@@ -125,47 +130,54 @@ impl AppExecutor {
                 Self::delete_selected_dependency(state)
             }
             AppEvent::User(Intent::UpdateInput(key_code)) => {
-                Self::handle_input(&mut state.search_phrase, key_code);
+                Self::handle_input(&mut state.data.search_phrase, key_code);
             }
             AppEvent::User(Intent::SubmitDependencyChanges) => {
                 Self::submit_dependency_changes(state);
             }
             AppEvent::User(Intent::NavigateDependencyList(direction)) => {
-                Self::navigate_list(&mut state.dependencies, direction);
+                Self::navigate_list(state, direction);
             }
             AppEvent::User(Intent::FindNewDependencies(search_phrase)) => {
                 let effect = Self::find_new_dependencies(search_phrase);
                 effects.push(effect);
             }
             AppEvent::Async(AsyncEvent::MavenDependenciesFound(dependencies)) => {
-                state.found_dependencies.items = dependencies;
+                state.data.found_dependencies = dependencies;
+            }
+            AppEvent::User(Intent::FocusNextView) => {
+                Self::focus_next_view(state);
             }
             _ => (),
         };
     }
 
     fn exit_app(state: &mut AppState) {
-        state.exit = true;
+        state.data.exit = true;
     }
 
     fn enter_input_mode(state: &mut AppState) {
-        state.mode = InteractionMode::Input;
+        state.data.mode = InteractionMode::Input;
     }
 
     fn leave_input_mode(state: &mut AppState) {
-        state.mode = InteractionMode::Normal;
+        state.data.mode = InteractionMode::Normal;
     }
 
     fn submit_dependency_changes(state: &mut AppState) {
         state
+            .data
             .maven_file
-            .update_dependencies(&state.dependencies.items);
+            .update_dependencies(&state.data.dependencies);
 
         // TODO Send event on success and / or on error.
     }
 
-    fn navigate_list<T>(list: &mut List<T>, direction: Navigation) {
-        list.navigate(direction);
+    fn navigate_list(state: &mut AppState, direction: Navigation) {
+        match direction {
+            Navigation::Next => state.ui_state.dependency_list_state.select_next(),
+            Navigation::Previous => state.ui_state.dependency_list_state.select_previous()
+        };
     }
 
     fn handle_input(text: &mut String, key_code: KeyCode) {
@@ -179,16 +191,25 @@ impl AppExecutor {
     }
 
     fn delete_selected_dependency(state: &mut AppState) {
-        if let Some(index) = state.dependencies.state.selected() {
-            state.dependencies.items.remove(index);
+        if let Some(index) = state.ui_state.dependency_list_state.selected() {
+            state.data.dependencies.remove(index);
 
-            let len = state.dependencies.items.len();
+            let len = state.data.dependencies.len();
             if len == 0 {
-                state.dependencies.state.select(None);
+                state.ui_state.dependency_list_state.select(None);
             } else if index >= len {
-                state.dependencies.state.select(Some(len - 1));
+                state.ui_state.dependency_list_state.select(Some(len - 1));
             }
         }
+    }
+
+    fn focus_next_view(state: &mut AppState) {
+        // let keys: Vec<ViewId> = state.ui.views.keys().cloned().collect();
+
+        // if let Some(current_index) = keys.iter().position(|v| *v == state.currently_focused_view) {
+          //   let next_index = (current_index + 1) % keys.len();
+            // state.currently_focused_view = keys[next_index].clone();
+        //}
     }
 
     fn find_new_dependencies(search_phrase: String) -> Effect {

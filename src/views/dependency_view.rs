@@ -5,19 +5,19 @@ use ratatui::{
     text::Line,
     widgets::{Block, HighlightSpacing, List, ListItem, StatefulWidget},
 };
-
-use crate::{dependency::JavaDependency, list, ui::alternate_colors};
+use crate::{views::View, app::{Data, UIState}, ui::alternate_colors};
 
 const SELECTED_STYLE: Style = Style::new().bg(SLATE.c800).add_modifier(Modifier::BOLD);
 
-pub struct DependencyView {}
+pub struct DependencyView;
 
-impl DependencyView {
-    pub fn render(&self, buffer: &mut Buffer, area: Rect, state: &mut list::List<JavaDependency>) {
+impl View for DependencyView {
+
+    fn render(&self, buffer: &mut Buffer, area: Rect, state: &Data, ui_state: &mut UIState) {
         let block = Block::new().title(Line::raw("Dependencies").centered());
 
         let items: Vec<ListItem> = state
-            .items
+            .dependencies
             .iter()
             .enumerate()
             .map(|(i, dependency)| {
@@ -34,6 +34,6 @@ impl DependencyView {
             .highlight_symbol(">")
             .highlight_spacing(HighlightSpacing::Always);
 
-        StatefulWidget::render(list, area, buffer, &mut state.state);
+        StatefulWidget::render(list, area, buffer, &mut ui_state.dependency_list_state);
     }
 }

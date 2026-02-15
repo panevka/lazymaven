@@ -5,7 +5,12 @@ use ratatui::{
     text::Line,
     widgets::{ListState, Block, HighlightSpacing, List, ListItem, StatefulWidget},
 };
-use crate::{views::View, app::{Data, UIState}, ui::alternate_colors};
+use crate::{
+    views::View,
+    app::{Data, UIState}, 
+    ui::alternate_colors, 
+    events::Intent
+};
 
 use crossterm::event::{Event, KeyCode};
 
@@ -49,15 +54,25 @@ impl View for DependencyView {
         StatefulWidget::render(list, area, buffer, &mut self.list_state);
     }
 
-    fn handle_event(&mut self, event: &Event) {
+    fn handle_event(&mut self, event: &Event) -> Option<Intent> {
         if let Event::Key(key_event) = event {
             let keycode = key_event.code;
 
             match keycode {
                 KeyCode::Char('j') => self.list_state.select_next(),
                 KeyCode::Char('k') => self.list_state.select_previous(),
+                KeyCode::Char('d') =>  {
+                    if let Some(index) = self.list_state.selected() {
+                        return Some(Intent::DeleteSelectedDependency { index });
+                    };
+                }
                 _ => ()
-            }
+            };
+
+            return None;
+
         }
+
+        return None;
     }
 }

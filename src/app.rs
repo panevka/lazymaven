@@ -30,8 +30,6 @@ pub struct AppState {
 pub struct UIState {
     pub views: Vec<(ViewId, Box<dyn View>)>,
     pub currently_focused_view: ViewId,
-    pub dependency_list_state: ListState,
-    pub search_list_state: ListState,
 }
 
 pub struct Data {
@@ -65,8 +63,6 @@ impl App {
                             Box::new(DependencySearchView::new()),
                         ),
                     ],
-                    dependency_list_state: Default::default(),
-                    search_list_state: Default::default(),
                     currently_focused_view: ViewId::DependencyView,
                 },
                 data: Data {
@@ -89,7 +85,6 @@ impl App {
             .get_dependencies()
             .context("no dependencies found")?;
         self.state.data.dependencies = dependencies;
-        self.state.ui_state.dependency_list_state.select_first();
         self.spawn_input_task(self.tx.clone());
         return Ok(());
     }

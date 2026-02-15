@@ -40,8 +40,7 @@ pub enum Intent {
     LeaveInputMode,
     UpdateInput(KeyCode),
     SubmitDependencyChanges,
-    DeleteSelectedDependency,
-    NavigateDependencyList(Navigation),
+    DeleteSelectedDependency { index: usize },
     FindNewDependencies(String),
     FocusNextView,
     FocusPreviousView,
@@ -69,15 +68,6 @@ impl IntentMapping for AppIntentHandler {
         let default_mapping = HashMap::from([
             (KeyCode::Char('q'), Intent::Exit),
             (KeyCode::Char('i'), Intent::EnterInputMode),
-       //   (
-       //       KeyCode::Char('j'),
-       //       Intent::NavigateDependencyList(Navigation::Next),
-       //   ),
-       //   (
-       //       KeyCode::Char('k'),
-       //       Intent::NavigateDependencyList(Navigation::Previous),
-       //   ),
-            (KeyCode::Char('d'), Intent::DeleteSelectedDependency),
             (KeyCode::Char('a'), Intent::SubmitDependencyChanges),
             (
                 KeyCode::Char('w'),
@@ -127,7 +117,9 @@ impl AppExecutor {
     pub fn handle_event(event: AppEvent, state: &mut AppState, effects: &mut Vec<Effect>) {
 
         if let AppEvent::Raw(raw_event) = event {
-            AppExecutor::handle_event_for_focused_view(&raw_event, state);
+            AppExecutor::handle_event_for_focused_view(&raw_event, state).
+                map(|intent| 
+                    AppExecutor::execute(AppEvent::User(intent), state, effects));
 
             let ctx = EventContext::from(&state);
             AppIntentHandler::event_to_intent(raw_event, ctx).
@@ -147,17 +139,14 @@ impl AppExecutor {
                 Self::enter_input_mode(state);
             }
             AppEvent::User(Intent::LeaveInputMode) => Self::leave_input_mode(state),
-            AppEvent::User(Intent::DeleteSelectedDependency) => {
-                Self::delete_selected_dependency(state)
+            AppEvent::User(Intent::DeleteSelectedDependency { index }) => {
+                Self::delete_selected_dependency(index, state)
             }
             AppEvent::User(Intent::UpdateInput(key_code)) => {
                 Self::handle_input(&mut state.data.search_phrase, key_code);
             }
             AppEvent::User(Intent::SubmitDependencyChanges) => {
                 Self::submit_dependency_changes(state);
-            }
-            AppEvent::User(Intent::NavigateDependencyList(direction)) => {
-                Self::navigate_list(state, direction);
             }
             AppEvent::User(Intent::FindNewDependencies(search_phrase)) => {
                 let effect = Self::find_new_dependencies(search_phrase);
@@ -173,13 +162,15 @@ impl AppExecutor {
         };
     }
 
-    fn handle_event_for_focused_view(event: &Event, state: &mut AppState) {
+    fn handle_event_for_focused_view(event: &Event, state: &mut AppState) -> Option<Intent> {
         let focused = &state.ui_state.currently_focused_view;
         let views = &mut state.ui_state.views;
 
         if let Some((view_id, view)) = views.iter_mut().find(|(view_id, view)| *view_id == *focused) {
-            view.handle_event(&event);
+            return view.handle_event(&event);
         }
+
+        return None;
     }
 
     fn exit_app(state: &mut AppState) {
@@ -203,13 +194,6 @@ impl AppExecutor {
         // TODO Send event on success and / or on error.
     }
 
-    fn navigate_list(state: &mut AppState, direction: Navigation) {
-        match direction {
-            Navigation::Next => state.ui_state.dependency_list_state.select_next(),
-            Navigation::Previous => state.ui_state.dependency_list_state.select_previous()
-        };
-    }
-
     fn handle_input(text: &mut String, key_code: KeyCode) {
         match key_code {
             KeyCode::Backspace => {
@@ -220,17 +204,8 @@ impl AppExecutor {
         };
     }
 
-    fn delete_selected_dependency(state: &mut AppState) {
-        if let Some(index) = state.ui_state.dependency_list_state.selected() {
-            state.data.dependencies.remove(index);
-
-            let len = state.data.dependencies.len();
-            if len == 0 {
-                state.ui_state.dependency_list_state.select(None);
-            } else if index >= len {
-                state.ui_state.dependency_list_state.select(Some(len - 1));
-            }
-        }
+    fn delete_selected_dependency(index: usize, state: &mut AppState) {
+         state.data.dependencies.remove(index);
     }
 
     fn focus_next_view(state: &mut AppState) {

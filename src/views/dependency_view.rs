@@ -7,7 +7,7 @@ use ratatui::{
 };
 use crate::{views::View, app::{Data, UIState}, ui::alternate_colors};
 
-use crossterm::event::KeyCode;
+use crossterm::event::{Event, KeyCode};
 
 const SELECTED_STYLE: Style = Style::new().bg(SLATE.c800).add_modifier(Modifier::BOLD);
 
@@ -25,7 +25,7 @@ impl DependencyView {
 
 impl View for DependencyView {
 
-    fn render(&self, buffer: &mut Buffer, area: Rect, state: &Data, ui_state: &mut UIState) {
+    fn render(&mut self, buffer: &mut Buffer, area: Rect, state: &Data) {
         let block = Block::new().title(Line::raw("Dependencies").centered());
 
         let items: Vec<ListItem> = state
@@ -46,14 +46,18 @@ impl View for DependencyView {
             .highlight_symbol(">")
             .highlight_spacing(HighlightSpacing::Always);
 
-        StatefulWidget::render(list, area, buffer, &mut ui_state.dependency_list_state);
+        StatefulWidget::render(list, area, buffer, &mut self.list_state);
     }
 
-    fn handle_key(&mut self, keycode: KeyCode) {
-        match keycode {
-            KeyCode::Char('j') => self.list_state.select_next(),
-            KeyCode::Char('k') => self.list_state.select_previous(),
-            _ => ()
+    fn handle_event(&mut self, event: &Event) {
+        if let Event::Key(key_event) = event {
+            let keycode = key_event.code;
+
+            match keycode {
+                KeyCode::Char('j') => self.list_state.select_next(),
+                KeyCode::Char('k') => self.list_state.select_previous(),
+                _ => ()
+            }
         }
     }
 }

@@ -2,7 +2,7 @@ pub mod dependency_search_view;
 pub mod dependency_view;
 
 use ratatui::{buffer::Buffer, layout::Rect, prelude::Widget};
-use crossterm::event::KeyCode;
+use crossterm::event::Event;
 
 use crate::app::{Data, UIState};
 
@@ -14,7 +14,7 @@ pub enum ViewId {
 
 pub trait View {
 
-    fn render(&self, buffer: &mut Buffer, area: Rect, state: &Data, ui_state: &mut UIState);
+    fn render(&mut self, buffer: &mut Buffer, area: Rect, state: &Data);
 
-    fn handle_key(&mut self, keycode: KeyCode);
+    fn handle_event(&mut self, event: &Event);
 }

@@ -22,15 +22,15 @@ impl UI {
             .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
             .split(f.area());
 
-        let views: &Vec<(ViewId, Box<dyn View>)> = &app_state.views;
+        let views: &mut Vec<(ViewId, Box<dyn View>)> = &mut ui_state.views;
 
         let mut buffer = f.buffer_mut();
 
 
-        for (view_id, view) in views.iter() {
+        for (view_id, view) in views.iter_mut() {
             match view_id {
-                ViewId::DependencyView => view.render(buffer, chunks[0], app_state, ui_state),
-                ViewId::DependencySearchView => view.render(buffer, chunks[1], app_state, ui_state),
+                ViewId::DependencyView => view.render(buffer, chunks[0], app_state),
+                ViewId::DependencySearchView => view.render(buffer, chunks[1], app_state),
             }
         }
 

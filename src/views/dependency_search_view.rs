@@ -3,20 +3,30 @@ use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Modifier, Style, Stylize, palette::tailwind::SLATE},
     text::Line,
-    widgets::{Block, HighlightSpacing, List, ListItem, StatefulWidget, Widget},
+    widgets::{ListState, Block, HighlightSpacing, List, ListItem, StatefulWidget, Widget},
 };
 
-use crossterm::event::KeyCode;
+use crossterm::event::{KeyCode, Event};
 
 use crate::{app::{Data, UIState}, ui::alternate_colors, views::View};
 
 const SELECTED_STYLE: Style = Style::new().bg(SLATE.c800).add_modifier(Modifier::BOLD);
 
-pub struct DependencySearchView;
+pub struct DependencySearchView {
+    list_state: ListState
+}
+
+impl DependencySearchView {
+    pub fn new() -> Self {
+        Self {
+            list_state: Default::default()
+        }
+    }
+}
 
 impl View for DependencySearchView {
 
-    fn render(&self, buffer: &mut Buffer, area: Rect, state: &Data, ui_state: &mut UIState) {
+    fn render(&mut self, buffer: &mut Buffer, area: Rect, state: &Data) {
         let layout = Layout::default()
             .direction(Direction::Vertical)
             .constraints(vec![
@@ -49,8 +59,18 @@ impl View for DependencySearchView {
             .highlight_symbol(">")
             .highlight_spacing(HighlightSpacing::Always);
 
-        StatefulWidget::render(list, layout[2], buffer, &mut ui_state.search_list_state);
+        StatefulWidget::render(list, layout[2], buffer, &mut self.list_state);
     }
 
-    fn handle_key(&mut self, keycode: KeyCode) {}
+    fn handle_event(&mut self, event: &Event) {
+        if let Event::Key(key_event) = event {
+            let keycode = key_event.code;
+
+            match keycode {
+                KeyCode::Char('j') => self.list_state.select_next(),
+                KeyCode::Char('k') => self.list_state.select_previous(),
+                _ => ()
+            }
+        }
+    }
 }

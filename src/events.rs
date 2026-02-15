@@ -13,6 +13,7 @@ use crate::{
 pub struct EventContext<'a> {
     pub mode: InteractionMode,
     pub search_phrase: &'a String,
+    pub currently_focused_view: &'a ViewId
 }
 
 impl<'a> EventContext<'a> {
@@ -20,6 +21,7 @@ impl<'a> EventContext<'a> {
         Self {
             mode: app_state.data.mode,
             search_phrase: &app_state.data.search_phrase,
+            currently_focused_view: &app_state.ui_state.currently_focused_view,
         }
     }
 }
@@ -42,7 +44,8 @@ pub enum Intent {
     NavigateDependencyList(Navigation),
     FindNewDependencies(String),
     FocusNextView,
-    FocusPreviousView
+    FocusPreviousView,
+    HandleViewMapping(ViewId, Event)
 }
 
 #[derive(Debug)]
@@ -66,14 +69,14 @@ impl IntentMapping for AppIntentHandler {
         let default_mapping = HashMap::from([
             (KeyCode::Char('q'), Intent::Exit),
             (KeyCode::Char('i'), Intent::EnterInputMode),
-            (
-                KeyCode::Char('j'),
-                Intent::NavigateDependencyList(Navigation::Next),
-            ),
-            (
-                KeyCode::Char('k'),
-                Intent::NavigateDependencyList(Navigation::Previous),
-            ),
+       //   (
+       //       KeyCode::Char('j'),
+       //       Intent::NavigateDependencyList(Navigation::Next),
+       //   ),
+       //   (
+       //       KeyCode::Char('k'),
+       //       Intent::NavigateDependencyList(Navigation::Previous),
+       //   ),
             (KeyCode::Char('d'), Intent::DeleteSelectedDependency),
             (KeyCode::Char('a'), Intent::SubmitDependencyChanges),
             (
@@ -89,6 +92,7 @@ impl IntentMapping for AppIntentHandler {
 }
 
 impl AppIntentHandler {
+
     pub fn event_to_intent(event: Event, ctx: EventContext) -> Option<Intent> {
         let intent = match event {
             Event::Key(key_event) => AppIntentHandler::handle_key_event(key_event, ctx),
@@ -119,7 +123,24 @@ impl AppIntentHandler {
 pub struct AppExecutor {}
 
 impl AppExecutor {
-    pub fn handle_intent(event: AppEvent, state: &mut AppState, effects: &mut Vec<Effect>) {
+
+    pub fn handle_event(event: AppEvent, state: &mut AppState, effects: &mut Vec<Effect>) {
+
+        if let AppEvent::Raw(raw_event) = event {
+            AppExecutor::handle_event_for_focused_view(&raw_event, state);
+
+            let ctx = EventContext::from(&state);
+            AppIntentHandler::event_to_intent(raw_event, ctx).
+                map(|intent| 
+                    AppExecutor::execute(AppEvent::User(intent), state, effects));
+        } else {
+            AppExecutor::execute(event, state, effects);
+        }
+
+    }
+
+    pub fn execute(event: AppEvent, state: &mut AppState, effects: &mut Vec<Effect>) {
+
         match event {
             AppEvent::User(Intent::Exit) => Self::exit_app(state),
             AppEvent::User(Intent::EnterInputMode) => {
@@ -143,13 +164,22 @@ impl AppExecutor {
                 effects.push(effect);
             }
             AppEvent::Async(AsyncEvent::MavenDependenciesFound(dependencies)) => {
-                state.data.found_dependencies = dependencies;
+               state.data.found_dependencies = dependencies;
             }
             AppEvent::User(Intent::FocusNextView) => {
                 Self::focus_next_view(state);
             }
             _ => (),
         };
+    }
+
+    fn handle_event_for_focused_view(event: &Event, state: &mut AppState) {
+        let focused = &state.ui_state.currently_focused_view;
+        let views = &mut state.ui_state.views;
+
+        if let Some((view_id, view)) = views.iter_mut().find(|(view_id, view)| *view_id == *focused) {
+            view.handle_event(&event);
+        }
     }
 
     fn exit_app(state: &mut AppState) {
@@ -204,12 +234,12 @@ impl AppExecutor {
     }
 
     fn focus_next_view(state: &mut AppState) {
-        // let keys: Vec<ViewId> = state.ui.views.keys().cloned().collect();
+        let views = &state.ui_state.views;
 
-        // if let Some(current_index) = keys.iter().position(|v| *v == state.currently_focused_view) {
-          //   let next_index = (current_index + 1) % keys.len();
-            // state.currently_focused_view = keys[next_index].clone();
-        //}
+        if let Some(current_index) = views.iter().position(|(v, _)| *v == state.ui_state.currently_focused_view) {
+            let next_index = (current_index + 1) % views.len();
+            state.ui_state.currently_focused_view = views[next_index].0.clone();
+        }
     }
 
     fn find_new_dependencies(search_phrase: String) -> Effect {

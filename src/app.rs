@@ -28,13 +28,13 @@ pub struct AppState {
 }
 
 pub struct UIState {
+    pub views: Vec<(ViewId, Box<dyn View>)>,
     pub currently_focused_view: ViewId,
     pub dependency_list_state: ListState,
     pub search_list_state: ListState,
 }
 
 pub struct Data {
-    pub views: Vec<(ViewId, Box<dyn View>)>,
     pub mode: InteractionMode,
     pub maven_file: MavenFile,
     pub search_phrase: String,
@@ -58,18 +58,18 @@ impl App {
             rx,
             state: AppState {
                 ui_state: UIState {
+                    views: vec![
+                        (ViewId::DependencyView, Box::new(DependencyView::new())),
+                        (
+                            ViewId::DependencySearchView,
+                            Box::new(DependencySearchView::new()),
+                        ),
+                    ],
                     dependency_list_state: Default::default(),
                     search_list_state: Default::default(),
                     currently_focused_view: ViewId::DependencyView,
                 },
                 data: Data {
-                    views: vec![
-                        (ViewId::DependencyView, Box::new(DependencyView::new())),
-                        (
-                            ViewId::DependencySearchView,
-                            Box::new(DependencySearchView {}),
-                        ),
-                    ],
                     mode: InteractionMode::Normal,
                     found_dependencies: Default::default(),
                     search_phrase: String::default(),
@@ -109,21 +109,7 @@ impl App {
             }
 
             if let Some(event) = self.rx.recv().await {
-                match event {
-                    AppEvent::Raw(ev) => {
-                        let ctx = EventContext::from(&self.state);
-                        if let Some(intent) = AppIntentHandler::event_to_intent(ev, ctx) {
-                            AppExecutor::handle_intent(
-                                AppEvent::User(intent),
-                                &mut self.state,
-                                &mut effects,
-                            );
-                        }
-                    }
-                    other => {
-                        AppExecutor::handle_intent(other, &mut self.state, &mut effects);
-                    }
-                }
+                AppExecutor::handle_event(event, &mut self.state, &mut effects)
             }
         }
 

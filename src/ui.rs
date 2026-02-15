@@ -15,6 +15,7 @@ const ALT_ROW_BG_COLOR: Color = SLATE.c900;
 pub struct UI;
 
 impl UI {
+
     pub fn render(f: &mut Frame, ui_state: &mut UIState, app_state: &Data) {
         let chunks = ratatui::layout::Layout::default()
             .direction(Direction::Horizontal)
@@ -25,7 +26,14 @@ impl UI {
 
         let mut buffer = f.buffer_mut();
 
-        views[0].1.render(buffer, chunks[0], app_state, ui_state);
+
+        for (view_id, view) in views.iter() {
+            match view_id {
+                ViewId::DependencyView => view.render(buffer, chunks[0], app_state, ui_state),
+                ViewId::DependencySearchView => view.render(buffer, chunks[1], app_state, ui_state),
+            }
+        }
+
     }
 }
 

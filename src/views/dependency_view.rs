@@ -3,13 +3,25 @@ use ratatui::{
     prelude::{Color, Modifier, Rect, Style, style::palette::tailwind::SLATE},
     style::Stylize,
     text::Line,
-    widgets::{Block, HighlightSpacing, List, ListItem, StatefulWidget},
+    widgets::{ListState, Block, HighlightSpacing, List, ListItem, StatefulWidget},
 };
 use crate::{views::View, app::{Data, UIState}, ui::alternate_colors};
 
+use crossterm::event::KeyCode;
+
 const SELECTED_STYLE: Style = Style::new().bg(SLATE.c800).add_modifier(Modifier::BOLD);
 
-pub struct DependencyView;
+pub struct DependencyView {
+    list_state: ListState
+}
+
+impl DependencyView {
+    pub fn new () -> Self {
+        Self {
+            list_state: Default::default()
+        }
+    }
+}
 
 impl View for DependencyView {
 
@@ -35,5 +47,13 @@ impl View for DependencyView {
             .highlight_spacing(HighlightSpacing::Always);
 
         StatefulWidget::render(list, area, buffer, &mut ui_state.dependency_list_state);
+    }
+
+    fn handle_key(&mut self, keycode: KeyCode) {
+        match keycode {
+            KeyCode::Char('j') => self.list_state.select_next(),
+            KeyCode::Char('k') => self.list_state.select_previous(),
+            _ => ()
+        }
     }
 }

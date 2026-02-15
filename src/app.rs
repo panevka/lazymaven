@@ -9,10 +9,11 @@ use crate::{
     events::{
         self, AppAsyncOrchestrator, AppEvent, AppExecutor, AppIntentHandler, Effect, EventContext,
     },
-    maven_registry,
-    ui,
-    ui::{UI},
-    views::{View, ViewId, dependency_view::DependencyView, dependency_search_view::DependencySearchView}
+    maven_registry, ui,
+    ui::UI,
+    views::{
+        View, ViewId, dependency_search_view::DependencySearchView, dependency_view::DependencyView,
+    },
 };
 
 pub struct App {
@@ -63,8 +64,11 @@ impl App {
                 },
                 data: Data {
                     views: vec![
-                        (ViewId::DependencyView, Box::new(DependencyView{})),
-                        (ViewId::DependencySearchView, Box::new(DependencySearchView{}))
+                        (ViewId::DependencyView, Box::new(DependencyView::new())),
+                        (
+                            ViewId::DependencySearchView,
+                            Box::new(DependencySearchView {}),
+                        ),
                     ],
                     mode: InteractionMode::Normal,
                     found_dependencies: Default::default(),
@@ -73,7 +77,7 @@ impl App {
                     maven_file: Default::default(),
                     exit: false,
                 },
-            }
+            },
         };
 
         Ok(me)

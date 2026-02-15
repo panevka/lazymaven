@@ -6,6 +6,8 @@ use ratatui::{
     widgets::{Block, HighlightSpacing, List, ListItem, StatefulWidget, Widget},
 };
 
+use crossterm::event::KeyCode;
+
 use crate::{app::{Data, UIState}, ui::alternate_colors, views::View};
 
 const SELECTED_STYLE: Style = Style::new().bg(SLATE.c800).add_modifier(Modifier::BOLD);
@@ -50,4 +52,5 @@ impl View for DependencySearchView {
         StatefulWidget::render(list, layout[2], buffer, &mut ui_state.search_list_state);
     }
 
+    fn handle_key(&mut self, keycode: KeyCode) {}
 }

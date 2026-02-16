@@ -17,13 +17,13 @@ use crossterm::event::{Event, KeyCode};
 const SELECTED_STYLE: Style = Style::new().bg(SLATE.c800).add_modifier(Modifier::BOLD);
 
 pub struct DependencyView {
-    list_state: ListState
+    list_state: ListState,
 }
 
 impl DependencyView {
     pub fn new () -> Self {
         Self {
-            list_state: Default::default()
+            list_state: Default::default(),
         }
     }
 }

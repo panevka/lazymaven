@@ -12,7 +12,6 @@ use crate::{
 
 pub struct EventContext<'a> {
     pub mode: InteractionMode,
-    pub search_phrase: &'a String,
     pub currently_focused_view: &'a ViewId
 }
 
@@ -20,7 +19,6 @@ impl<'a> EventContext<'a> {
     pub fn from(app_state: &'a AppState) -> Self {
         Self {
             mode: app_state.data.mode,
-            search_phrase: &app_state.data.search_phrase,
             currently_focused_view: &app_state.ui_state.currently_focused_view,
         }
     }
@@ -38,7 +36,6 @@ pub enum Intent {
     Exit,
     EnterInputMode,
     LeaveInputMode,
-    UpdateInput(KeyCode),
     SubmitDependencyChanges,
     DeleteSelectedDependency { index: usize },
     FindNewDependencies(String),
@@ -69,10 +66,6 @@ impl IntentMapping for AppIntentHandler {
             (KeyCode::Char('q'), Intent::Exit),
             (KeyCode::Char('i'), Intent::EnterInputMode),
             (KeyCode::Char('a'), Intent::SubmitDependencyChanges),
-            (
-                KeyCode::Char('w'),
-                Intent::FindNewDependencies(ctx.search_phrase.to_string()),
-            ),
             (KeyCode::Tab, Intent::FocusNextView),
             (KeyCode::BackTab, Intent::FocusPreviousView),
         ]);
@@ -93,15 +86,6 @@ impl AppIntentHandler {
     }
 
     fn handle_key_event(key_event: KeyEvent, ctx: EventContext) -> Option<Intent> {
-        if let InteractionMode::Input = ctx.mode {
-            let intent = match key_event.code {
-                KeyCode::Esc => Some(Intent::LeaveInputMode),
-                _ => Some(Intent::UpdateInput(key_event.code)),
-            };
-
-            return intent;
-        }
-
         let mapping = Self::get_mapping(ctx);
 
         let intent = mapping.get(&key_event.code)?;
@@ -135,15 +119,8 @@ impl AppExecutor {
 
         match event {
             AppEvent::User(Intent::Exit) => Self::exit_app(state),
-            AppEvent::User(Intent::EnterInputMode) => {
-                Self::enter_input_mode(state);
-            }
-            AppEvent::User(Intent::LeaveInputMode) => Self::leave_input_mode(state),
             AppEvent::User(Intent::DeleteSelectedDependency { index }) => {
                 Self::delete_selected_dependency(index, state)
-            }
-            AppEvent::User(Intent::UpdateInput(key_code)) => {
-                Self::handle_input(&mut state.data.search_phrase, key_code);
             }
             AppEvent::User(Intent::SubmitDependencyChanges) => {
                 Self::submit_dependency_changes(state);
@@ -177,14 +154,6 @@ impl AppExecutor {
         state.data.exit = true;
     }
 
-    fn enter_input_mode(state: &mut AppState) {
-        state.data.mode = InteractionMode::Input;
-    }
-
-    fn leave_input_mode(state: &mut AppState) {
-        state.data.mode = InteractionMode::Normal;
-    }
-
     fn submit_dependency_changes(state: &mut AppState) {
         state
             .data
@@ -192,16 +161,6 @@ impl AppExecutor {
             .update_dependencies(&state.data.dependencies);
 
         // TODO Send event on success and / or on error.
-    }
-
-    fn handle_input(text: &mut String, key_code: KeyCode) {
-        match key_code {
-            KeyCode::Backspace => {
-                text.pop();
-            }
-            KeyCode::Char(char) => text.push(char),
-            _ => (),
-        };
     }
 
     fn delete_selected_dependency(index: usize, state: &mut AppState) {

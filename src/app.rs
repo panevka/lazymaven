@@ -35,7 +35,6 @@ pub struct UIState {
 pub struct Data {
     pub mode: InteractionMode,
     pub maven_file: MavenFile,
-    pub search_phrase: String,
     pub found_dependencies: Vec<SearchResponseDoc>,
     pub dependencies: Vec<JavaDependency>,
     pub exit: bool,
@@ -68,7 +67,6 @@ impl App {
                 data: Data {
                     mode: InteractionMode::Normal,
                     found_dependencies: Default::default(),
-                    search_phrase: String::default(),
                     dependencies: Default::default(),
                     maven_file: Default::default(),
                     exit: false,

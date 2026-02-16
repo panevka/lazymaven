@@ -18,13 +18,17 @@ use crate::{
 const SELECTED_STYLE: Style = Style::new().bg(SLATE.c800).add_modifier(Modifier::BOLD);
 
 pub struct DependencySearchView {
-    list_state: ListState
+    list_state: ListState,
+    input_mode: bool,
+    input: String,
 }
 
 impl DependencySearchView {
     pub fn new() -> Self {
         Self {
-            list_state: Default::default()
+            list_state: Default::default(),
+            input_mode: false,
+            input: Default::default(),
         }
     }
 }
@@ -44,7 +48,7 @@ impl View for DependencySearchView {
         let block = Block::new().title(Line::raw("Search Dependencies").centered());
         block.render(layout[0], buffer);
 
-        let text_input = Block::new().title(Line::raw(&state.search_phrase).centered());
+        let text_input = Block::new().title(Line::raw(&self.input).centered());
         text_input.render(layout[1], buffer);
 
         let items: Vec<ListItem> = state
@@ -71,7 +75,26 @@ impl View for DependencySearchView {
         if let Event::Key(key_event) = event {
             let keycode = key_event.code;
 
+            if self.input_mode {
+                match keycode {
+                    KeyCode::Esc => {
+                        self.input_mode = false;
+                    }
+                    KeyCode::Backspace => {
+                        self.input.pop();
+                    }
+                    KeyCode::Char(char) => self.input.push(char),
+                    _ => (),
+                };
+            }
+
             match keycode {
+                KeyCode::Char('i') => {
+                    self.input_mode = true;
+                }
+                KeyCode::Char('s') => {
+                    return Some(Intent::FindNewDependencies(self.input.to_string()));
+                }
                 KeyCode::Char('j') => self.list_state.select_next(),
                 KeyCode::Char('k') => self.list_state.select_previous(),
                 _ => ()

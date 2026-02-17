@@ -1,8 +1,12 @@
 use anyhow::{Context, Result};
 use dependency::JavaDependency;
-use maven_registry::SearchResponseDoc;
+use maven_registry::{
+        SearchResponseDoc,
+        GetVersionsResponseDoc,
+    };
 use ratatui::{DefaultTerminal, widgets::ListState};
 use tokio::sync::mpsc;
+use std::collections::HashMap;
 
 use crate::{
     dependency::{self, MavenFile},
@@ -38,6 +42,7 @@ pub struct Data {
     pub found_dependencies: Vec<SearchResponseDoc>,
     pub dependencies: Vec<JavaDependency>,
     pub exit: bool,
+    pub found_dependency_versions: HashMap<String, Vec<GetVersionsResponseDoc>>,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -67,6 +72,7 @@ impl App {
                 data: Data {
                     mode: InteractionMode::Normal,
                     found_dependencies: Default::default(),
+                    found_dependency_versions: Default::default(),
                     dependencies: Default::default(),
                     maven_file: Default::default(),
                     exit: false,

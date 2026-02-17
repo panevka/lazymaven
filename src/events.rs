@@ -5,7 +5,13 @@ use tokio::sync::mpsc;
 
 use crate::{
     app::{AppState, UIState, InteractionMode},
-    maven_registry::{MavenRegistry, MavenResponse, SearchResponseDoc},
+    maven_registry::{
+        MavenRegistry, 
+        MavenResponse, 
+        SearchResponseDoc, 
+        SearchResponse,
+        GetVersionsResponse
+    },
     views::ViewId,
     ui::Navigation,
 };
@@ -39,6 +45,7 @@ pub enum Intent {
     SubmitDependencyChanges,
     DeleteSelectedDependency { index: usize },
     FindNewDependencies(String),
+    GetAvailableDependencyVersions { index: usize },
     FocusNextView,
     FocusPreviousView,
     HandleViewMapping(ViewId, Event)
@@ -47,11 +54,16 @@ pub enum Intent {
 #[derive(Debug)]
 pub enum AsyncEvent {
     MavenDependenciesFound(Vec<SearchResponseDoc>),
+    MavenDependencyVersionsFound(MavenResponse<GetVersionsResponse>)
 }
 
 #[derive(Debug)]
 pub enum Effect {
     SearchMaven(String),
+    GetAvailableDependencyVersions { 
+        group_id: String, 
+        artifact_id: String 
+    },
 }
 
 trait IntentMapping {
@@ -126,11 +138,29 @@ impl AppExecutor {
                 Self::submit_dependency_changes(state);
             }
             AppEvent::User(Intent::FindNewDependencies(search_phrase)) => {
-                let effect = Self::find_new_dependencies(search_phrase);
+                effects.push(Effect::SearchMaven(search_phrase));
+            }
+            AppEvent::User(Intent::GetAvailableDependencyVersions { index }) => {
+                let dependency = state.data.found_dependencies.get(index).unwrap();
+                let group_id = (&dependency.g).to_string();
+                let artifact_id = (&dependency.a).to_string();
+
+                let effect = Effect::GetAvailableDependencyVersions { group_id, artifact_id };
                 effects.push(effect);
             }
             AppEvent::Async(AsyncEvent::MavenDependenciesFound(dependencies)) => {
-               state.data.found_dependencies = dependencies;
+                state.data.found_dependencies = dependencies;
+            }
+            AppEvent::Async(AsyncEvent::MavenDependencyVersionsFound(response)) => {
+                let versions = response.response.docs;
+                if let Some(first_version) = versions.get(0) {
+                    let group_id  = &first_version.g;
+                    let artifact_id = &first_version.a;
+
+                    let dependency_id = format!("{}:{}", group_id, artifact_id);
+
+                    state.data.found_dependency_versions.insert(dependency_id, versions);
+                }
             }
             AppEvent::User(Intent::FocusNextView) => {
                 Self::focus_next_view(state);
@@ -175,31 +205,27 @@ impl AppExecutor {
             state.ui_state.currently_focused_view = views[next_index].0.clone();
         }
     }
-
-    fn find_new_dependencies(search_phrase: String) -> Effect {
-        return Effect::SearchMaven(search_phrase);
-    }
 }
 
 pub struct AppAsyncOrchestrator {}
 
 impl AppAsyncOrchestrator {
     pub async fn handle_async_event(effect: Effect, tx: mpsc::Sender<AppEvent>) -> Result<()> {
-        let result = match effect {
-            Effect::SearchMaven(search_phrase) => Self::search_maven(search_phrase),
+        match effect {
+            Effect::SearchMaven(search_phrase) => { 
+                let result = MavenRegistry::search_dependencies(search_phrase);
+                let response = result.await?.response.docs;
+                let event = AppEvent::Async(AsyncEvent::MavenDependenciesFound(response));
+                tx.send(event).await?;
+            },
+            Effect::GetAvailableDependencyVersions { group_id, artifact_id } => {
+                let result = MavenRegistry::get_available_dependency_versions(group_id, artifact_id);
+                let response = result.await?;
+                let event = AppEvent::Async(AsyncEvent::MavenDependencyVersionsFound(response));
+                tx.send(event).await?;
+            }
         };
 
-        let response = result.await?.response.docs;
-
-        let event = AppEvent::Async(AsyncEvent::MavenDependenciesFound(response));
-
-        tx.send(event).await?;
-
         return Ok(());
-    }
-
-    fn search_maven(search_phrase: String) -> impl Future<Output = Result<MavenResponse>> {
-        let result = MavenRegistry::search_dependencies(search_phrase);
-        return result;
     }
 }

@@ -19,16 +19,20 @@ const SELECTED_STYLE: Style = Style::new().bg(SLATE.c800).add_modifier(Modifier:
 
 pub struct DependencySearchView {
     list_state: ListState,
+    versions: ListState,
     input_mode: bool,
     input: String,
+    display_dependency_details: bool,
 }
 
 impl DependencySearchView {
     pub fn new() -> Self {
         Self {
             list_state: Default::default(),
+            versions: Default::default(),
             input_mode: false,
             input: Default::default(),
+            display_dependency_details: true,
         }
     }
 }
@@ -41,7 +45,8 @@ impl View for DependencySearchView {
             .constraints(vec![
                 Constraint::Percentage(10),
                 Constraint::Percentage(10),
-                Constraint::Percentage(50),
+                Constraint::Percentage(20),
+                Constraint::Percentage(20),
             ])
             .split(area);
 
@@ -69,6 +74,37 @@ impl View for DependencySearchView {
             .highlight_spacing(HighlightSpacing::Always);
 
         StatefulWidget::render(list, layout[2], buffer, &mut self.list_state);
+
+        if let Some(index) = self.list_state.selected() {
+            if let Some(currently_selected) = state.found_dependencies.get(index) {
+                let id = format!("{}:{}", currently_selected.g, currently_selected.a);
+                
+                let mut sum = state.found_dependency_versions.get(&id);
+                let default = &Vec::new();
+
+                let versions = sum.get_or_insert(default);
+
+                let items: Vec<ListItem> = versions 
+                    .iter()
+                    .enumerate()
+                    .map(|(i, version)| {
+                        let item = String::from(format!("{}", version.v));
+
+                        let color = alternate_colors(i);
+                        ListItem::new(item).bg(color)
+                    })
+                    .collect();
+
+                let list = List::new(items)
+                    .highlight_style(SELECTED_STYLE)
+                    .highlight_symbol(">")
+                    .highlight_spacing(HighlightSpacing::Always);
+
+                StatefulWidget::render(list, layout[3], buffer, &mut self.versions);
+            }
+        }
+
+
     }
 
     fn handle_event(&mut self, event: &Event) -> Option<Intent> {
@@ -99,6 +135,11 @@ impl View for DependencySearchView {
                 }
                 KeyCode::Char('j') => self.list_state.select_next(),
                 KeyCode::Char('k') => self.list_state.select_previous(),
+                KeyCode::Enter => {
+                    if let Some(index) = self.list_state.selected() {
+                        return Some(Intent::GetAvailableDependencyVersions { index });
+                    }
+                }
                 _ => ()
             }
         }

@@ -86,6 +86,8 @@ impl View for DependencySearchView {
                     KeyCode::Char(char) => self.input.push(char),
                     _ => (),
                 };
+
+                return None;
             }
 
             match keycode {

@@ -19,20 +19,20 @@ const SELECTED_STYLE: Style = Style::new().bg(SLATE.c800).add_modifier(Modifier:
 
 pub struct DependencySearchView {
     list_state: ListState,
-    versions: ListState,
+    versions_list_state: ListState,
+    version_list_focused: bool,
     input_mode: bool,
     input: String,
-    display_dependency_details: bool,
 }
 
 impl DependencySearchView {
     pub fn new() -> Self {
         Self {
             list_state: Default::default(),
-            versions: Default::default(),
+            versions_list_state: Default::default(),
+            version_list_focused: false,
             input_mode: false,
             input: Default::default(),
-            display_dependency_details: true,
         }
     }
 }
@@ -45,10 +45,17 @@ impl View for DependencySearchView {
             .constraints(vec![
                 Constraint::Percentage(10),
                 Constraint::Percentage(10),
-                Constraint::Percentage(20),
-                Constraint::Percentage(20),
+                Constraint::Percentage(50),
             ])
             .split(area);
+
+        let dependencies_layout = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints(vec![
+                Constraint::Percentage(70),
+                Constraint::Percentage(30),
+            ])
+            .split(layout[2]);
 
         let block = Block::new().title(Line::raw("Search Dependencies").centered());
         block.render(layout[0], buffer);
@@ -73,7 +80,7 @@ impl View for DependencySearchView {
             .highlight_symbol(">")
             .highlight_spacing(HighlightSpacing::Always);
 
-        StatefulWidget::render(list, layout[2], buffer, &mut self.list_state);
+        StatefulWidget::render(list, dependencies_layout[0], buffer, &mut self.list_state);
 
         if let Some(index) = self.list_state.selected() {
             if let Some(currently_selected) = state.found_dependencies.get(index) {
@@ -100,7 +107,7 @@ impl View for DependencySearchView {
                     .highlight_symbol(">")
                     .highlight_spacing(HighlightSpacing::Always);
 
-                StatefulWidget::render(list, layout[3], buffer, &mut self.versions);
+                StatefulWidget::render(list, dependencies_layout[1], buffer, &mut self.versions_list_state);
             }
         }
 
@@ -126,6 +133,11 @@ impl View for DependencySearchView {
                 return None;
             }
 
+            let focused_list = match self.version_list_focused {
+                true => &mut self.versions_list_state,
+                false => &mut self.list_state,
+            };
+
             match keycode {
                 KeyCode::Char('i') => {
                     self.input_mode = true;
@@ -133,8 +145,10 @@ impl View for DependencySearchView {
                 KeyCode::Char('s') => {
                     return Some(Intent::FindNewDependencies(self.input.to_string()));
                 }
-                KeyCode::Char('j') => self.list_state.select_next(),
-                KeyCode::Char('k') => self.list_state.select_previous(),
+                KeyCode::Char('j') => focused_list.select_next(),
+                KeyCode::Char('l') => self.version_list_focused = true,
+                KeyCode::Char('h') => self.version_list_focused = false,
+                KeyCode::Char('k') => focused_list.select_previous(),
                 KeyCode::Enter => {
                     if let Some(index) = self.list_state.selected() {
                         return Some(Intent::GetAvailableDependencyVersions { index });
